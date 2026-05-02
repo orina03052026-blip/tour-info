@@ -285,9 +285,17 @@
       // ★ 今日の日付と一致する行だけを抽出
       const todayData = allData.filter(row => normalizeDate(row.date) === todayStr);
 
+      // ▼ デバッグ表示（確認後に削除）
+      el.innerHTML = '<p style="font-size:0.8rem;padding:10px;background:#fffbe6;border-radius:8px;margin-bottom:10px">'
+        + '今日: ' + todayStr + '<br>'
+        + 'データ件数: ' + allData.length + '<br>'
+        + 'データ日付: ' + allData.map(r => r.date).join(', ') + '<br>'
+        + '一致件数: ' + todayData.length
+        + '</p>';
+      // ▲ デバッグ表示ここまで
+
       if (todayData.length === 0) {
-        // 今日のデータがない場合
-        el.innerHTML = `
+        el.innerHTML += `
           <div class="closed-msg">
             <div class="icon">🌅</div>
             <h2>本日の受付は終了しました</h2>
