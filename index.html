@@ -187,7 +187,7 @@
 <script>
   // ============================================================
   // ★★★ ここだけ変更してください ★★★
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxwUalpr9jtccqz18j6Gpnj-hoz393R57Wz9TVH3xDpG7mZ70dRe7OgW7N5xn5t2WJf/exec';
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMjWVjk6y5r7T-IzmWpX4WFk9oxJP49VZOF1Q_SkneUHhRydRL3t2MDwZWAotzPsRF_Dl4M2gs4Fug/pub?output=csv';
   // ============================================================
 
   const STAFF = {
@@ -195,90 +195,106 @@
     'Sho':  { cls: 'sho',  avatar: '🌊' },
   };
 
-  // 提供している全ツアー（固定）
-  // スプレッドシートへの入力不要。空き枠では必ずこの3つが表示される。
   const ALL_TOURS = [
     'E-Bike Ride around the Castle, Slurp like a Local',
     'e-bike Ride to the Sea, Slurp like a Local',
     'Himeji Castle Guide',
   ];
 
+  // 今日の日付（日本時間）
+  const _now = new Date();
+  const todayY = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', year:  'numeric' }));
+  const todayM = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric' }));
+  const todayD = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', day:   'numeric' }));
+
   document.getElementById('date-display').textContent =
-    new Date().toLocaleDateString('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
-    });
+    _now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+
+  // CSVの日付セルがどんな形式でも今日かどうか判定する
+  function isToday(str) {
+    if (!str || str === '日付') return false;
+    var s = str.replace(/年/g, '/').replace(/月/g, '/').replace(/日/g, '');
+    var parts = s.split(/[\/\-]/).map(p => parseInt(p.trim())).filter(n => !isNaN(n));
+    var y, m, d;
+    if (parts.length === 2) {
+      y = todayY; m = parts[0]; d = parts[1];       // 5/3
+    } else if (parts.length === 3 && parts[0] > 31) {
+      y = parts[0]; m = parts[1]; d = parts[2];      // 2026/5/3
+    } else if (parts.length === 3) {
+      m = parts[0]; d = parts[1]; y = parts[2];      // 5/3/2026
+    } else { return false; }
+    return y === todayY && m === todayM && d === todayD;
+  }
+
+  // CSV1行をカラム配列に変換（引用符内のカンマ対応）
+  function parseRow(row) {
+    var cols = []; var cur = ''; var inQ = false;
+    for (var i = 0; i < row.length; i++) {
+      var c = row[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  }
 
   // ---- 表示ロジック ----
 
   function timeSection(label, status) {
-    let chipsHtml = '';
-
+    var html;
     if (status === '予約可能') {
-      // 空き → 全ツアーを緑チップで表示
-      chipsHtml = ALL_TOURS.map(t =>
-        `<span class="chip open">◯ ${t}</span>`
-      ).join('');
-
+      html = ALL_TOURS.map(t => `<span class="chip open">◯ ${t}</span>`).join('');
     } else if (status === '満員') {
-      // 予約済み → 全ツアーを取り消し線で表示（1枠1ツアーのため全部クローズ）
-      const closedTours = ALL_TOURS.map(t =>
-        `<span class="chip closed">${t}</span>`
-      ).join('');
-      chipsHtml = `<span class="chip sold-out">× Fully Booked</span>${closedTours}`;
-
+      html = `<span class="chip sold-out">× Fully Booked</span>`
+           + ALL_TOURS.map(t => `<span class="chip closed">${t}</span>`).join('');
     } else {
-      // 休み
-      chipsHtml = `<span class="chip off">ー Day Off</span>`;
+      html = `<span class="chip off">ー Day Off</span>`;
     }
-
-    return `<div class="time-section">
-              <div class="time-label">${label}</div>
-              <div class="tour-list">${chipsHtml}</div>
-            </div>`;
+    return `<div class="time-section"><div class="time-label">${label}</div><div class="tour-list">${html}</div></div>`;
   }
 
-  function staffCard(member) {
-    const s = STAFF[member.staff] || { cls: '', avatar: '👤' };
+  function staffCard(m) {
+    var s = STAFF[m.staff] || { cls: '', avatar: '👤' };
     return `<div class="staff-card">
               <div class="staff-header ${s.cls}">
                 <div class="staff-avatar">${s.avatar}</div>
-                <div class="staff-name">${member.staff}</div>
+                <div class="staff-name">${m.staff}</div>
               </div>
-              ${timeSection('AM', member.amStatus)}
-              ${timeSection('PM', member.pmStatus)}
+              ${timeSection('AM', m.amStatus)}
+              ${timeSection('PM', m.pmStatus)}
             </div>`;
   }
 
-  // ---- データ取得・日付フィルタリング ----
+  // ---- CSV取得・表示 ----
 
   async function loadData() {
-    const el = document.getElementById('main-container');
+    var el = document.getElementById('main-container');
     el.innerHTML = '<div class="status-msg">読み込み中...</div>';
-
     try {
-      const res = await fetch(API_URL + '?t=' + Date.now());
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      var res = await fetch(SHEET_CSV_URL + '&t=' + Date.now());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var lines = text.trim().split('\n').slice(1); // 1行目ヘッダーをスキップ
+      var data = lines
+        .map(parseRow)
+        .filter(c => isToday(c[0]))
+        .map(c => ({ staff: c[1], amStatus: c[2], pmStatus: c[3] }))
+        .filter(r => r.staff);
 
-      // 日付フィルタリングはApps Script側で処理済み
-      // 返ってきたデータをそのまま表示する
       if (!data.length) {
-        el.innerHTML = `
-          <div class="closed-msg">
-            <div class="icon">🌅</div>
-            <h2>本日の受付は終了しました</h2>
-            <p>またのご参加をお待ちしています。<br>お問い合わせはお気軽にどうぞ。</p>
-          </div>`;
+        el.innerHTML = `<div class="closed-msg">
+          <div class="icon">🌅</div>
+          <h2>本日の受付は終了しました</h2>
+          <p>またのご参加をお待ちしています。<br>お問い合わせはお気軽にどうぞ。</p>
+        </div>`;
         return;
       }
-
       el.innerHTML = `<div class="staff-grid">${data.map(staffCard).join('')}</div>`;
       document.getElementById('update-time').textContent =
-        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute:'2-digit' });
-
-    } catch {
-      el.innerHTML = '<div class="status-msg error">⚠ データを読み込めませんでした。<br>URLの設定を確認してください。</div>';
+        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+    } catch(e) {
+      el.innerHTML = '<div class="status-msg error">⚠ データを読み込めませんでした：' + e.message + '</div>';
     }
   }
 
