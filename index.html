@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>今日のツアー | Ka Na Sho</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f0f7fa;
+      min-height: 100vh;
+    }
+
+    /* ---- ヘッダー ---- */
+    header {
+      background: linear-gradient(160deg, #1a1a2e 0%, #0f3460 100%);
+      color: white;
+      text-align: center;
+      padding: 28px 16px 22px;
+    }
+    header h1 { font-size: 1.55rem; letter-spacing: 0.1em; }
+    header .subtitle { font-size: 0.8rem; opacity: 0.6; letter-spacing: 0.15em; margin-top: 4px; }
+    header .date { font-size: 0.92rem; opacity: 0.85; margin-top: 10px; }
+    .refresh-btn {
+      display: inline-block;
+      margin-top: 12px;
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 20px;
+      padding: 5px 20px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+    }
+    .refresh-btn:active { background: rgba(255,255,255,0.25); }
+
+    /* ---- グリッド ---- */
+    .container { padding: 16px; max-width: 680px; margin: 0 auto; }
+
+    .staff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 380px) {
+      .staff-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ---- スタッフカード ---- */
+    .staff-card {
+      background: white;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+    }
+
+    .staff-header {
+      padding: 16px 14px 14px;
+      text-align: center;
+      color: white;
+    }
+    .staff-header.kana { background: linear-gradient(135deg, #d63384, #ff6eb0); }
+    .staff-header.sho  { background: linear-gradient(135deg, #0a7a6a, #1bc9a8); }
+
+    .staff-avatar { font-size: 2.2rem; line-height: 1; }
+    .staff-name {
+      font-size: 1.4rem;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+      margin-top: 6px;
+    }
+
+    /* ---- AM / PM セクション ---- */
+    .time-section {
+      padding: 12px 13px;
+      border-bottom: 1px solid #f3f3f3;
+    }
+    .time-section:last-child { border-bottom: none; }
+
+    .time-label {
+      font-size: 0.68rem;
+      font-weight: bold;
+      letter-spacing: 0.2em;
+      color: #ccc;
+      margin-bottom: 9px;
+    }
+
+    /* ---- ツアーチップ ---- */
+    .tour-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      line-height: 1.4;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 予約可能：緑 */
+    .chip.open {
+      background: #e6f7ee;
+      color: #1a7f4b;
+      border: 1.5px solid #a8e6c0;
+    }
+
+    /* 満員（取り消し線グレー） */
+    .chip.closed {
+      background: #f5f5f5;
+      color: #bbb;
+      border: 1.5px solid #e0e0e0;
+      text-decoration: line-through;
+      text-decoration-color: #ccc;
+    }
+
+    /* 受付終了バッジ */
+    .chip.sold-out {
+      background: #fff0e6;
+      color: #c85000;
+      border: 1.5px solid #ffd0a8;
+      font-size: 0.82rem;
+    }
+
+    /* 休み・終了：グレー */
+    .chip.off {
+      background: #f5f5f5;
+      color: #bbb;
+      border: 1.5px solid #e8e8e8;
+    }
+
+    /* ---- 汎用メッセージ ---- */
+    .status-msg {
+      text-align: center;
+      color: #aaa;
+      padding: 52px 20px;
+      font-size: 0.95rem;
+      line-height: 2;
+    }
+    .status-msg.error { color: #cc3333; }
+
+    /* 「本日の受付終了」メッセージ用 */
+    .closed-msg {
+      background: white;
+      border-radius: 18px;
+      padding: 36px 20px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+    .closed-msg .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .closed-msg h2 { font-size: 1.05rem; color: #555; margin-bottom: 10px; }
+    .closed-msg p  { font-size: 0.85rem; color: #aaa; line-height: 1.8; }
+
+    footer {
+      text-align: center;
+      color: #ccc;
+      font-size: 0.7rem;
+      padding: 18px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚲 Ka Na Sho Tours</h1>
+  <p class="subtitle">3 HOURS TOUR</p>
+  <p class="date" id="date-display"></p>
+  <button class="refresh-btn" onclick="loadData()">↻ 更新</button>
+</header>
+
+<div class="container">
+  <div id="main-container">
+    <div class="status-msg">読み込み中...</div>
+  </div>
+</div>
+
+<footer>最終更新: <span id="update-time">-</span></footer>
+
+<script>
+  // ============================================================
+  // ★★★ ここだけ変更してください ★★★
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxwUalpr9jtccqz18j6Gpnj-hoz393R57Wz9TVH3xDpG7mZ70dRe7OgW7N5xn5t2WJf/exec';
+  // ============================================================
+
+  const STAFF = {
+    'Kana': { cls: 'kana', avatar: '🌸' },
+    'Sho':  { cls: 'sho',  avatar: '🌊' },
+  };
+
+  // 日本時間で「今日」を YYYY-MM-DD 形式で返す
+  // （sv-SE ロケールは ISO 8601 形式で出力するため利用）
+  function getTodayJST() {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  }
+
+  const todayStr = getTodayJST();
+
+  document.getElementById('date-display').textContent =
+    new Date().toLocaleDateString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+    });
+
+  // ---- 表示ロジック ----
+
+  function timeSection(label, status, tours) {
+    let chipsHtml = '';
+
+    if (status === '予約可能') {
+      chipsHtml = tours.length
+        ? tours.map(t => `<span class="chip open">◯ ${t}</span>`).join('')
+        : `<span class="chip off">ー ツアー未設定</span>`;
+
+    } else if (status === '満員') {
+      // 1枠に1ツアーしか入らないため、1つ埋まれば全ツアーが受付終了
+      const closedTours = tours.map(t => `<span class="chip closed">${t}</span>`).join('');
+      chipsHtml = `<span class="chip sold-out">× 受付終了</span>${closedTours}`;
+
+    } else {
+      chipsHtml = `<span class="chip off">ー 本日休み</span>`;
+    }
+
+    return `<div class="time-section">
+              <div class="time-label">${label}</div>
+              <div class="tour-list">${chipsHtml}</div>
+            </div>`;
+  }
+
+  function staffCard(member) {
+    const s = STAFF[member.staff] || { cls: '', avatar: '👤' };
+    return `<div class="staff-card">
+              <div class="staff-header ${s.cls}">
+                <div class="staff-avatar">${s.avatar}</div>
+                <div class="staff-name">${member.staff}</div>
+              </div>
+              ${timeSection('AM', member.amStatus, member.amTours)}
+              ${timeSection('PM', member.pmStatus, member.pmTours)}
+            </div>`;
+  }
+
+  // ---- データ取得・日付フィルタリング ----
+
+  async function loadData() {
+    const el = document.getElementById('main-container');
+    el.innerHTML = '<div class="status-msg">読み込み中...</div>';
+
+    try {
+      const res = await fetch(API_URL + '?t=' + Date.now());
+      if (!res.ok) throw new Error();
+      const allData = await res.json();
+
+      // ★ 今日の日付と一致する行だけを抽出
+      const todayData = allData.filter(row => row.date === todayStr);
+
+      if (todayData.length === 0) {
+        // 今日のデータがない場合
+        el.innerHTML = `
+          <div class="closed-msg">
+            <div class="icon">🌅</div>
+            <h2>本日の受付は終了しました</h2>
+            <p>またのご参加をお待ちしています。<br>お問い合わせはお気軽にどうぞ。</p>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = `<div class="staff-grid">${todayData.map(staffCard).join('')}</div>`;
+      document.getElementById('update-time').textContent =
+        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+
+    } catch {
+      el.innerHTML = '<div class="status-msg error">⚠ データを読み込めませんでした。<br>URLの設定を確認してください。</div>';
+    }
+  }
+
+  loadData();
+  setInterval(loadData, 10 * 60 * 1000);
+</script>
+
+</body>
+</html>
