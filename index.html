@@ -203,27 +203,6 @@
     'Himeji Castle Guide',
   ];
 
-  function getTodayJST() {
-    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-  }
-
-  const todayStr = getTodayJST();
-
-  // スプレッドシートの日付形式が何であっても今日と一致するか確認する
-  function normalizeDate(dateStr) {
-    if (!dateStr) return '';
-    // すでに "2026-05-03" 形式ならそのまま返す
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    // "5/3" → 年を補完して "2026/5/3" に変換
-    if (/^\d{1,2}\/\d{1,2}$/.test(dateStr)) {
-      var year = new Date().getFullYear();
-      dateStr = year + '/' + dateStr;
-    }
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-  }
-
   document.getElementById('date-display').textContent =
     new Date().toLocaleDateString('ja-JP', {
       timeZone: 'Asia/Tokyo',
@@ -280,22 +259,12 @@
     try {
       const res = await fetch(API_URL + '?t=' + Date.now());
       if (!res.ok) throw new Error();
-      const allData = await res.json();
+      const data = await res.json();
 
-      // ★ 今日の日付と一致する行だけを抽出
-      const todayData = allData.filter(row => normalizeDate(row.date) === todayStr);
-
-      // ▼ デバッグ表示（確認後に削除）
-      el.innerHTML = '<p style="font-size:0.8rem;padding:10px;background:#fffbe6;border-radius:8px;margin-bottom:10px">'
-        + '今日: ' + todayStr + '<br>'
-        + 'データ件数: ' + allData.length + '<br>'
-        + 'データ日付: ' + allData.map(r => r.date).join(', ') + '<br>'
-        + '一致件数: ' + todayData.length
-        + '</p>';
-      // ▲ デバッグ表示ここまで
-
-      if (todayData.length === 0) {
-        el.innerHTML += `
+      // 日付フィルタリングはApps Script側で処理済み
+      // 返ってきたデータをそのまま表示する
+      if (!data.length) {
+        el.innerHTML = `
           <div class="closed-msg">
             <div class="icon">🌅</div>
             <h2>本日の受付は終了しました</h2>
@@ -304,9 +273,9 @@
         return;
       }
 
-      el.innerHTML = `<div class="staff-grid">${todayData.map(staffCard).join('')}</div>`;
+      el.innerHTML = `<div class="staff-grid">${data.map(staffCard).join('')}</div>`;
       document.getElementById('update-time').textContent =
-        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute:'2-digit' });
 
     } catch {
       el.innerHTML = '<div class="status-msg error">⚠ データを読み込めませんでした。<br>URLの設定を確認してください。</div>';
