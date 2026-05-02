@@ -195,19 +195,14 @@
     'Sho':  { cls: 'sho',  avatar: '🌊' },
   };
 
-  // スプレッドシートの日本語ツアー名 → HP表示用英語名
-  const TOUR_NAMES = {
-    '旧街道をゆく姫路城下町巡りツアー': 'E-Bike Ride around the Castle, Slurp like a Local',
-    '飾磨街道から海を目指すツアー':     'e-bike Ride to the Sea, Slurp like a Local',
-    '姫路城ガイドツアー':               'Himeji Castle Guide',
-  };
+  // 提供している全ツアー（固定）
+  // スプレッドシートへの入力不要。空き枠では必ずこの3つが表示される。
+  const ALL_TOURS = [
+    'E-Bike Ride around the Castle, Slurp like a Local',
+    'e-bike Ride to the Sea, Slurp like a Local',
+    'Himeji Castle Guide',
+  ];
 
-  function translateTour(name) {
-    return TOUR_NAMES[name.trim()] || name;
-  }
-
-  // 日本時間で「今日」を YYYY-MM-DD 形式で返す
-  // （sv-SE ロケールは ISO 8601 形式で出力するため利用）
   function getTodayJST() {
     return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   }
@@ -222,21 +217,25 @@
 
   // ---- 表示ロジック ----
 
-  function timeSection(label, status, tours) {
+  function timeSection(label, status) {
     let chipsHtml = '';
 
     if (status === '予約可能') {
-      chipsHtml = tours.length
-        ? tours.map(t => `<span class="chip open">◯ ${translateTour(t)}</span>`).join('')
-        : `<span class="chip off">ー ツアー未設定</span>`;
+      // 空き → 全ツアーを緑チップで表示
+      chipsHtml = ALL_TOURS.map(t =>
+        `<span class="chip open">◯ ${t}</span>`
+      ).join('');
 
     } else if (status === '満員') {
-      // 1枠に1ツアーしか入らないため、1つ埋まれば全ツアーが受付終了
-      const closedTours = tours.map(t => `<span class="chip closed">${translateTour(t)}</span>`).join('');
-      chipsHtml = `<span class="chip sold-out">× 受付終了</span>${closedTours}`;
+      // 予約済み → 全ツアーを取り消し線で表示（1枠1ツアーのため全部クローズ）
+      const closedTours = ALL_TOURS.map(t =>
+        `<span class="chip closed">${t}</span>`
+      ).join('');
+      chipsHtml = `<span class="chip sold-out">× Fully Booked</span>${closedTours}`;
 
     } else {
-      chipsHtml = `<span class="chip off">ー 本日休み</span>`;
+      // 休み
+      chipsHtml = `<span class="chip off">ー Day Off</span>`;
     }
 
     return `<div class="time-section">
@@ -252,8 +251,8 @@
                 <div class="staff-avatar">${s.avatar}</div>
                 <div class="staff-name">${member.staff}</div>
               </div>
-              ${timeSection('AM', member.amStatus, member.amTours)}
-              ${timeSection('PM', member.pmStatus, member.pmTours)}
+              ${timeSection('AM', member.amStatus)}
+              ${timeSection('PM', member.pmStatus)}
             </div>`;
   }
 
