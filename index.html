@@ -209,12 +209,16 @@
 
   const todayStr = getTodayJST();
 
-  // スプレッドシートの日付形式が"5/3"や"2026/5/3"でも一致するよう正規化する
+  // スプレッドシートの日付形式が何であっても今日と一致するか確認する
   function normalizeDate(dateStr) {
     if (!dateStr) return '';
     // すでに "2026-05-03" 形式ならそのまま返す
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    // "5/3" や "2026/5/3" などを Date に変換して正規化
+    // "5/3" → 年を補完して "2026/5/3" に変換
+    if (/^\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+      var year = new Date().getFullYear();
+      dateStr = year + '/' + dateStr;
+    }
     var d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
