@@ -209,6 +209,17 @@
 
   const todayStr = getTodayJST();
 
+  // スプレッドシートの日付形式が"5/3"や"2026/5/3"でも一致するよう正規化する
+  function normalizeDate(dateStr) {
+    if (!dateStr) return '';
+    // すでに "2026-05-03" 形式ならそのまま返す
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    // "5/3" や "2026/5/3" などを Date に変換して正規化
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  }
+
   document.getElementById('date-display').textContent =
     new Date().toLocaleDateString('ja-JP', {
       timeZone: 'Asia/Tokyo',
@@ -268,7 +279,7 @@
       const allData = await res.json();
 
       // ★ 今日の日付と一致する行だけを抽出
-      const todayData = allData.filter(row => row.date === todayStr);
+      const todayData = allData.filter(row => normalizeDate(row.date) === todayStr);
 
       if (todayData.length === 0) {
         // 今日のデータがない場合
