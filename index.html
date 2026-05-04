@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3日間のツアー予定 | Kana Sho</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Availability | Kana Sho Tours</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -223,19 +226,19 @@
 <body>
 
 <header>
-  <h1>🚲 Kana Sho Tours</h1>
+  <h1>🚲 空き状況</h1>
   <p class="subtitle">3 DAYS SCHEDULE</p>
   <p class="date" id="date-display"></p>
-  <button class="refresh-btn" onclick="loadData()">↻ 更新</button>
+  <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
 </header>
 
 <div class="container">
   <div id="main-container">
-    <div class="status-msg">読み込み中...</div>
+    <div class="status-msg">Loading...</div>
   </div>
 </div>
 
-<footer>最終更新: <span id="update-time">-</span></footer>
+<footer>Last updated: <span id="update-time">-</span></footer>
 
 <script>
   // ============================================================
@@ -248,16 +251,27 @@
     'Sho':  { cls: 'sho',  avatar: '🌊' },
   };
 
-  // 公式表記（act/hp/system_notes/error_prevention_memo.md §3 準拠）
+  // 公式表記（act_travel/hp/system_notes/error_prevention_memo.md §3 準拠）
   const ALL_TOURS = [
     'e-bike Ride around the Castle, Slurp Like a Local',
     'e-bike Ride to the Sea, Slurp Like a Local',
     'Himeji castle guide tour',
   ];
 
-  const DAY_LABELS = ['今日', '明日', '明後日'];
+  // プルダウン選択時の遷移先（WordPress 公開ページ）
+  const BOOKING_URLS = {
+    'e-bike Ride around the Castle, Slurp Like a Local':
+      'https://www.travel-network-act.co.jp/local/en/castle-town/',
+    'e-bike Ride to the Sea, Slurp Like a Local':
+      'https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/',
+    'Himeji castle guide tour':
+      'https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/',
+  };
+
+  const DAY_LABELS = ['Today', 'Tomorrow', 'Day After'];
   const DAY_BADGE  = ['today', 'tomorrow', 'after2'];
-  const WEEKDAYS   = ['日','月','火','水','木','金','土'];
+  const WEEKDAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // 今日・明日・明後日（日本時間）の年月日を作る
   function buildTargetDays() {
@@ -278,7 +292,7 @@
   (function setHeaderDate() {
     const a = TARGET_DAYS[0], b = TARGET_DAYS[2];
     document.getElementById('date-display').textContent =
-      `${a.m}月${a.d}日(${WEEKDAYS[a.w]}) 〜 ${b.m}月${b.d}日(${WEEKDAYS[b.w]})`;
+      `${MONTHS[a.m-1]} ${a.d} (${WEEKDAYS[a.w]}) – ${MONTHS[b.m-1]} ${b.d} (${WEEKDAYS[b.w]})`;
   })();
 
   // CSV日付セル → TARGET_DAYS のインデックス（0/1/2）または -1
@@ -320,15 +334,15 @@
   function timeSection(label, status) {
     let html;
     if (status === '予約可能') {
-      html = `<select class="tour-select">
-                <option value="">▼ ツアーを選択</option>
-                ${ALL_TOURS.map(t => `<option>${t}</option>`).join('')}
+      html = `<select class="tour-select" onchange="if(this.value)window.open(this.value,'_top')">
+                <option value="">▼ Select a tour</option>
+                ${ALL_TOURS.map(t => `<option value="${BOOKING_URLS[t] || ''}">${t}</option>`).join('')}
               </select>`;
     } else if (status === '満員') {
       html = `<span class="chip sold-out">× Fully Booked</span>`
            + ALL_TOURS.map(t => `<span class="chip closed">${t}</span>`).join('');
     } else {
-      html = `<span class="chip off">ー Day Off</span>`;
+      html = `<span class="chip off">– Day Off</span>`;
     }
     return `<div class="time-section"><div class="time-label">${label}</div><div class="tour-list">${html}</div></div>`;
   }
@@ -348,12 +362,12 @@
   function daySection(idx, rows) {
     const t = TARGET_DAYS[idx];
     const head = `<div class="day-header">
-                    📅 ${t.m}月${t.d}日(${WEEKDAYS[t.w]})
+                    📅 ${MONTHS[t.m-1]} ${t.d} (${WEEKDAYS[t.w]})
                     <span class="day-badge ${DAY_BADGE[idx]}">${DAY_LABELS[idx]}</span>
                   </div>`;
     const body = rows.length
       ? `<div class="staff-grid">${rows.map(staffCard).join('')}</div>`
-      : `<div class="empty-day">予定なし</div>`;
+      : `<div class="empty-day">No schedule</div>`;
     return `<div class="day-section">${head}${body}</div>`;
   }
 
@@ -361,7 +375,7 @@
 
   async function loadData() {
     const el = document.getElementById('main-container');
-    el.innerHTML = '<div class="status-msg">読み込み中...</div>';
+    el.innerHTML = '<div class="status-msg">Loading...</div>';
     try {
       const res = await fetch(SHEET_CSV_URL + '&t=' + Date.now());
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -379,17 +393,17 @@
       if (grouped.every(g => g.length === 0)) {
         el.innerHTML = `<div class="closed-msg">
           <div class="icon">🌅</div>
-          <h2>3日間の予定がありません</h2>
-          <p>スプレッドシートに今日〜明後日の予定を入力してください。</p>
+          <h2>No schedule for the next 3 days</h2>
+          <p>Please check back later.</p>
         </div>`;
         return;
       }
 
       el.innerHTML = grouped.map((rows, i) => daySection(i, rows)).join('');
       document.getElementById('update-time').textContent =
-        new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+        new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hour12: false });
     } catch(e) {
-      el.innerHTML = '<div class="status-msg error">⚠ データを読み込めませんでした：' + e.message + '</div>';
+      el.innerHTML = '<div class="status-msg error">⚠ Could not load data: ' + e.message + '</div>';
     }
   }
 
