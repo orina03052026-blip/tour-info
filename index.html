@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>今日のツアー | Ka Na Sho</title>
+  <title>3日間のツアー予定 | Ka Na Sho</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,8 +37,34 @@
     }
     .refresh-btn:active { background: rgba(255,255,255,0.25); }
 
-    /* ---- グリッド ---- */
     .container { padding: 16px; max-width: 680px; margin: 0 auto; }
+
+    /* ---- 日付セクション ---- */
+    .day-section { margin-bottom: 24px; }
+    .day-section:last-child { margin-bottom: 0; }
+
+    .day-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      color: #1a1a2e;
+      margin-bottom: 12px;
+      padding: 8px 4px;
+      border-bottom: 2px solid #0f3460;
+    }
+    .day-badge {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 12px;
+      color: white;
+      font-weight: normal;
+      letter-spacing: 0.05em;
+    }
+    .day-badge.today    { background: #d63384; }
+    .day-badge.tomorrow { background: #0f3460; }
+    .day-badge.after2   { background: #5a6c8a; }
 
     .staff-grid {
       display: grid;
@@ -47,6 +73,16 @@
     }
     @media (max-width: 380px) {
       .staff-grid { grid-template-columns: 1fr; }
+    }
+
+    .empty-day {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+      color: #aaa;
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
     /* ---- スタッフカード ---- */
@@ -137,6 +173,24 @@
       border: 1.5px solid #e8e8e8;
     }
 
+    /* ---- 予約可能時のプルダウン ---- */
+    .tour-select {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      font-family: inherit;
+      color: #1a7f4b;
+      background: #e6f7ee;
+      border: 1.5px solid #a8e6c0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tour-select:focus {
+      outline: 2px solid #1a7f4b;
+      outline-offset: 1px;
+    }
+
     /* ---- 汎用メッセージ ---- */
     .status-msg {
       text-align: center;
@@ -147,7 +201,6 @@
     }
     .status-msg.error { color: #cc3333; }
 
-    /* 「本日の受付終了」メッセージ用 */
     .closed-msg {
       background: white;
       border-radius: 18px;
@@ -171,7 +224,7 @@
 
 <header>
   <h1>🚲 Ka Na Sho Tours</h1>
-  <p class="subtitle">3 HOURS TOUR</p>
+  <p class="subtitle">3 DAYS SCHEDULE</p>
   <p class="date" id="date-display"></p>
   <button class="refresh-btn" onclick="loadData()">↻ 更新</button>
 </header>
@@ -195,42 +248,65 @@
     'Sho':  { cls: 'sho',  avatar: '🌊' },
   };
 
+  // 公式表記（act/hp/system_notes/error_prevention_memo.md §3 準拠）
   const ALL_TOURS = [
-    'E-Bike Ride around the Castle, Slurp like a Local',
-    'e-bike Ride to the Sea, Slurp like a Local',
-    'Himeji Castle Guide',
+    'e-bike Ride around the Castle, Slurp Like a Local',
+    'e-bike Ride to the Sea, Slurp Like a Local',
+    'Himeji castle guide tour',
   ];
 
-  // 今日の日付（日本時間）
-  const _now = new Date();
-  const todayY = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', year:  'numeric' }));
-  const todayM = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric' }));
-  const todayD = parseInt(_now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', day:   'numeric' }));
+  const DAY_LABELS = ['今日', '明日', '明後日'];
+  const DAY_BADGE  = ['today', 'tomorrow', 'after2'];
+  const WEEKDAYS   = ['日','月','火','水','木','金','土'];
 
-  document.getElementById('date-display').textContent =
-    _now.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  // 今日・明日・明後日（日本時間）の年月日を作る
+  function buildTargetDays() {
+    const now = new Date();
+    const y = parseInt(now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', year:  'numeric' }));
+    const m = parseInt(now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric' }));
+    const d = parseInt(now.toLocaleDateString('en-US', { timeZone: 'Asia/Tokyo', day:   'numeric' }));
+    const days = [];
+    for (let i = 0; i < 3; i++) {
+      const dt = new Date(y, m - 1, d + i);
+      days.push({ y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate(), w: dt.getDay() });
+    }
+    return days;
+  }
+  const TARGET_DAYS = buildTargetDays();
 
-  // CSVの日付セルがどんな形式でも今日かどうか判定する
-  function isToday(str) {
-    if (!str || str === '日付') return false;
-    var s = str.replace(/年/g, '/').replace(/月/g, '/').replace(/日/g, '');
-    var parts = s.split(/[\/\-]/).map(p => parseInt(p.trim())).filter(n => !isNaN(n));
-    var y, m, d;
+  // ヘッダーの日付レンジ表示
+  (function setHeaderDate() {
+    const a = TARGET_DAYS[0], b = TARGET_DAYS[2];
+    document.getElementById('date-display').textContent =
+      `${a.m}月${a.d}日(${WEEKDAYS[a.w]}) 〜 ${b.m}月${b.d}日(${WEEKDAYS[b.w]})`;
+  })();
+
+  // CSV日付セル → TARGET_DAYS のインデックス（0/1/2）または -1
+  // 公式仕様は yyyy年M月d日（例: 2026年5月4日）。互換のため /, - 区切りも残す。
+  function dayIndex(str) {
+    if (!str || str === '日付') return -1;
+    const s = str.replace(/年/g, '/').replace(/月/g, '/').replace(/日/g, '');
+    const parts = s.split(/[\/\-]/).map(p => parseInt(p.trim())).filter(n => !isNaN(n));
+    let y, m, d;
     if (parts.length === 2) {
-      y = todayY; m = parts[0]; d = parts[1];       // 5/3
+      y = TARGET_DAYS[0].y; m = parts[0]; d = parts[1];
     } else if (parts.length === 3 && parts[0] > 31) {
-      y = parts[0]; m = parts[1]; d = parts[2];      // 2026/5/3
+      y = parts[0]; m = parts[1]; d = parts[2];
     } else if (parts.length === 3) {
-      m = parts[0]; d = parts[1]; y = parts[2];      // 5/3/2026
-    } else { return false; }
-    return y === todayY && m === todayM && d === todayD;
+      m = parts[0]; d = parts[1]; y = parts[2];
+    } else { return -1; }
+    for (let i = 0; i < TARGET_DAYS.length; i++) {
+      const t = TARGET_DAYS[i];
+      if (t.y === y && t.m === m && t.d === d) return i;
+    }
+    return -1;
   }
 
   // CSV1行をカラム配列に変換（引用符内のカンマ対応）
   function parseRow(row) {
-    var cols = []; var cur = ''; var inQ = false;
-    for (var i = 0; i < row.length; i++) {
-      var c = row[i];
+    const cols = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < row.length; i++) {
+      const c = row[i];
       if (c === '"') { inQ = !inQ; }
       else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
       else { cur += c; }
@@ -242,9 +318,12 @@
   // ---- 表示ロジック ----
 
   function timeSection(label, status) {
-    var html;
+    let html;
     if (status === '予約可能') {
-      html = ALL_TOURS.map(t => `<span class="chip open">◯ ${t}</span>`).join('');
+      html = `<select class="tour-select">
+                <option value="">▼ ツアーを選択</option>
+                ${ALL_TOURS.map(t => `<option>${t}</option>`).join('')}
+              </select>`;
     } else if (status === '満員') {
       html = `<span class="chip sold-out">× Fully Booked</span>`
            + ALL_TOURS.map(t => `<span class="chip closed">${t}</span>`).join('');
@@ -255,7 +334,7 @@
   }
 
   function staffCard(m) {
-    var s = STAFF[m.staff] || { cls: '', avatar: '👤' };
+    const s = STAFF[m.staff] || { cls: '', avatar: '👤' };
     return `<div class="staff-card">
               <div class="staff-header ${s.cls}">
                 <div class="staff-avatar">${s.avatar}</div>
@@ -266,31 +345,47 @@
             </div>`;
   }
 
+  function daySection(idx, rows) {
+    const t = TARGET_DAYS[idx];
+    const head = `<div class="day-header">
+                    📅 ${t.m}月${t.d}日(${WEEKDAYS[t.w]})
+                    <span class="day-badge ${DAY_BADGE[idx]}">${DAY_LABELS[idx]}</span>
+                  </div>`;
+    const body = rows.length
+      ? `<div class="staff-grid">${rows.map(staffCard).join('')}</div>`
+      : `<div class="empty-day">予定なし</div>`;
+    return `<div class="day-section">${head}${body}</div>`;
+  }
+
   // ---- CSV取得・表示 ----
 
   async function loadData() {
-    var el = document.getElementById('main-container');
+    const el = document.getElementById('main-container');
     el.innerHTML = '<div class="status-msg">読み込み中...</div>';
     try {
-      var res = await fetch(SHEET_CSV_URL + '&t=' + Date.now());
+      const res = await fetch(SHEET_CSV_URL + '&t=' + Date.now());
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      var text = await res.text();
-      var lines = text.trim().split('\n').slice(1); // 1行目ヘッダーをスキップ
-      var data = lines
-        .map(parseRow)
-        .filter(c => isToday(c[0]))
-        .map(c => ({ staff: c[1], amStatus: c[2], pmStatus: c[3] }))
-        .filter(r => r.staff);
+      const text = await res.text();
+      const lines = text.trim().split('\n').slice(1);
 
-      if (!data.length) {
+      const grouped = [[], [], []];
+      lines.forEach(line => {
+        const c = parseRow(line);
+        const i = dayIndex(c[0]);
+        if (i < 0 || !c[1]) return;
+        grouped[i].push({ staff: c[1], amStatus: c[2], pmStatus: c[3] });
+      });
+
+      if (grouped.every(g => g.length === 0)) {
         el.innerHTML = `<div class="closed-msg">
           <div class="icon">🌅</div>
-          <h2>本日の受付は終了しました</h2>
-          <p>またのご参加をお待ちしています。<br>お問い合わせはお気軽にどうぞ。</p>
+          <h2>3日間の予定がありません</h2>
+          <p>スプレッドシートに今日〜明後日の予定を入力してください。</p>
         </div>`;
         return;
       }
-      el.innerHTML = `<div class="staff-grid">${data.map(staffCard).join('')}</div>`;
+
+      el.innerHTML = grouped.map((rows, i) => daySection(i, rows)).join('');
       document.getElementById('update-time').textContent =
         new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
     } catch(e) {
