@@ -1,111 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Availability | Kana Sho Tours</title>
   <style>
-    /* デザイン設定（変更なし） */
+    /* デザインは維持 */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f7fa; min-height: 100vh; }
-    header { background: linear-gradient(160deg, #1a1a2e 0%, #0f3460 100%); color: white; text-align: center; padding: 28px 16px 22px; }
-    header h1 { font-size: 1.55rem; letter-spacing: 0.1em; }
-    header .subtitle { font-size: 0.8rem; opacity: 0.6; letter-spacing: 0.15em; margin-top: 4px; }
-    .refresh-btn { display: inline-block; margin-top: 12px; background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.35); border-radius: 20px; padding: 5px 20px; font-size: 0.78rem; cursor: pointer; }
-    .container { padding: 16px; max-width: 680px; margin: 0 auto; }
-    .staff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    @media (max-width: 380px) { .staff-grid { grid-template-columns: 1fr; } }
+    body { font-family: sans-serif; background: #f0f7fa; padding: 16px; }
+    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
     .staff-card { background: white; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.09); margin-bottom: 20px; }
-    .staff-header { padding: 16px 14px 14px; text-align: center; color: white; }
+    .staff-header { padding: 16px; text-align: center; color: white; background: #0f3460; }
     .staff-header.kana { background: linear-gradient(135deg, #d63384, #ff6eb0); }
     .staff-header.sho { background: linear-gradient(135deg, #0a7a6a, #1bc9a8); }
-    .staff-name { font-size: 1.4rem; font-weight: bold; margin-top: 6px; }
-    .time-section { padding: 12px 13px; border-bottom: 1px solid #f3f3f3; }
-    .time-label { font-size: 0.68rem; font-weight: bold; color: #ccc; margin-bottom: 9px; }
-    .chip { border-radius: 8px; padding: 5px 10px; font-size: 0.78rem; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; }
-    .chip.open { background: #e6f7ee; color: #1a7f4b; border: 1.5px solid #a8e6c0; }
-    .chip.off { background: #f5f5f5; color: #bbb; border: 1.5px solid #e8e8e8; }
-    .tour-select { width: 100%; padding: 7px 10px; font-size: 0.78rem; font-weight: bold; color: #1a7f4b; background: #e6f7ee; border: 1.5px solid #a8e6c0; border-radius: 8px; }
-    footer { text-align: center; color: #ccc; font-size: 0.7rem; padding: 18px; }
+    .time-section { padding: 12px; border-bottom: 1px solid #eee; }
+    .status-box { padding: 8px; border-radius: 8px; background: #e6f7ee; color: #1a7f4b; font-weight: bold; text-align: center; }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>🚲 Availability</h1>
-  <p class="subtitle">3 DAYS SCHEDULE</p>
-  <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
-</header>
-
-<div class="container" id="main-container">
-  <div class="status-msg" style="text-align:center; padding:50px; color:#aaa;">Loading...</div>
-</div>
-
-<footer>Last updated: <span id="update-time">-</span></footer>
+<div class="staff-grid" id="main-container">Loading...</div>
 
 <script>
-  // ============================================================
-  //https://script.google.com/macros/s/AKfycbxwUalpr9jtccqz18j6Gpnj-hoz393R57Wz9TVH3xDpG7mZ70dRe7OgW7N5xn5t2WJf/exec
-  // 例: const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/.../exec';
-  const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwUalpr9jtccqz18j6Gpnj-hoz393R57Wz9TVH3xDpG7mZ70dRe7OgW7N5xn5t2WJf/exec';
-  // ============================================================
-
-  const STAFF_INFO = {
-    'Kana': { cls: 'kana', avatar: '🌸' },
-    'Sho':  { cls: 'sho',  avatar: '🌊' }
-  };
-
-  const BOOKING_URLS = {
-    'e-bike Ride around the Castle, Slurp Like a Local': 'https://www.travel-network-act.co.jp/local/en/castle-town/',
-    'e-bike Ride to the Sea, Slurp Like a Local': 'https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/',
-    'Himeji castle guide tour': 'https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/'
-  };
-
-  function createSlotHtml(label, slot) {
-    let content;
-    if (!slot || slot.status === "Day Off") {
-      content = `<span class="chip off">– Day Off</span>`;
-    } else if (slot.status === "空きあり") {
-      content = `<select class="tour-select" onchange="if(this.value)window.open(this.value,'_top')">
-                  <option value="">▼ Select a tour</option>
-                  ${Object.keys(BOOKING_URLS).map(t => `<option value="${BOOKING_URLS[t]}">${t}</option>`).join('')}
-                </select>`;
-    } else {
-      // 「残り1名」などの詳細表示
-      const isFull = slot.remaining <= 0;
-      content = `<span class="chip ${isFull ? 'off' : 'open'}">${slot.detail}</span>`;
-    }
-    return `<div class="time-section"><div class="time-label">${label}</div>${content}</div>`;
-  }
+  // ★ここに新しいGASのURLを貼り付けてください
+  const GAS_URL = 'ここにウェブアプリURLを貼り付け';
 
   async function loadData() {
     const container = document.getElementById('main-container');
     try {
-      const response = await fetch(GAS_WEB_APP_URL);
+      const response = await fetch(GAS_URL);
       const data = await response.json();
-
-      container.innerHTML = `<div class="staff-grid">
-        ${data.map(item => {
-          const s = STAFF_INFO[item.staff] || { cls: '', avatar: '👤' };
-          return `
-            <div class="staff-card">
-              <div class="staff-header ${s.cls}">
-                <div class="staff-avatar" style="font-size:2rem">${s.avatar}</div>
-                <div class="staff-name">${item.staff}</div>
-                <div style="font-size:0.7rem; opacity:0.8">${item.date}</div>
-              </div>
-              ${createSlotHtml('AM', item.am)}
-              ${createSlotHtml('PM', item.pm)}
-            </div>
-          `;
-        }).join('')}
-      </div>`;
-      document.getElementById('update-time').textContent = new Date().toLocaleTimeString();
+      
+      container.innerHTML = data.map(item => `
+        <div class="staff-card">
+          <div class="staff-header ${item.staff === 'Kana' ? 'kana' : 'sho'}">
+            <div style="font-size:1.4rem; font-weight:bold;">${item.staff}</div>
+            <div style="font-size:0.9rem;">${item.date}</div>
+          </div>
+          <div class="time-section">
+            <div style="font-size:0.7rem; color:#aaa;">AM</div>
+            <div class="status-box">${item.am || '-'}</div>
+          </div>
+          <div class="time-section">
+            <div style="font-size:0.7rem; color:#aaa;">PM</div>
+            <div class="status-box">${item.pm || '-'}</div>
+          </div>
+        </div>
+      `).join('');
     } catch (e) {
-      container.innerHTML = `<div style="text-align:center; padding:50px; color:red;">Error: GASのURLが正しいか確認してください</div>`;
+      container.innerHTML = "データの読み込みに失敗しました。";
     }
   }
-
   loadData();
 </script>
 </body>
