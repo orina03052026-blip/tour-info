@@ -2,52 +2,64 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Availability | Kana Sho Tours</title>
   <style>
-    /* デザインは維持 */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #f0f7fa; padding: 16px; }
-    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
-    .staff-card { background: white; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.09); margin-bottom: 20px; }
-    .staff-header { padding: 16px; text-align: center; color: white; background: #0f3460; }
-    .staff-header.kana { background: linear-gradient(135deg, #d63384, #ff6eb0); }
-    .staff-header.sho { background: linear-gradient(135deg, #0a7a6a, #1bc9a8); }
-    .time-section { padding: 12px; border-bottom: 1px solid #eee; }
-    .status-box { padding: 8px; border-radius: 8px; background: #e6f7ee; color: #1a7f4b; font-weight: bold; text-align: center; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f7fa; padding: 20px; color: #333; }
+    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+    .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .staff-header { padding: 20px; text-align: center; color: white; }
+    .staff-header.kana { background: linear-gradient(135deg, #ff7eb3, #ff758c); }
+    .staff-header.sho { background: linear-gradient(135deg, #2af598, #009efd); }
+    .staff-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; }
+    .tour-date { font-size: 1rem; opacity: 0.9; }
+    .slots { padding: 20px; }
+    .slot { margin-bottom: 15px; }
+    .slot-label { font-size: 0.8rem; color: #888; text-transform: uppercase; margin-bottom: 5px; }
+    .status-badge { padding: 12px; border-radius: 12px; text-align: center; font-weight: bold; font-size: 1.1rem; background: #f8f9fa; border: 1px solid #eee; }
+    .status-available { background: #e6fffa; color: #00a388; border-color: #b2f5ea; }
+    .status-busy { background: #fff5f5; color: #e53e3e; border-color: #feb2b2; }
   </style>
 </head>
 <body>
 
-<div class="staff-grid" id="main-container">Loading...</div>
+<div class="staff-grid" id="container">読み込み中...</div>
 
 <script>
-  // ★ここに新しいGASのURLを貼り付けてください
-  const GAS_URL = 'ここにウェブアプリURLを貼り付け';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
 
   async function loadData() {
-    const container = document.getElementById('main-container');
+    const container = document.getElementById('container');
     try {
       const response = await fetch(GAS_URL);
       const data = await response.json();
       
+      if (data.length === 0) {
+        container.innerHTML = "表示できる予約データがありません。";
+        return;
+      }
+
       container.innerHTML = data.map(item => `
         <div class="staff-card">
-          <div class="staff-header ${item.staff === 'Kana' ? 'kana' : 'sho'}">
-            <div style="font-size:1.4rem; font-weight:bold;">${item.staff}</div>
-            <div style="font-size:0.9rem;">${item.date}</div>
+          <div class="staff-header ${item.staff.toLowerCase() === 'kana' ? 'kana' : 'sho'}">
+            <div class="staff-name">${item.staff}</div>
+            <div class="tour-date">${item.date}</div>
           </div>
-          <div class="time-section">
-            <div style="font-size:0.7rem; color:#aaa;">AM</div>
-            <div class="status-box">${item.am || '-'}</div>
-          </div>
-          <div class="time-section">
-            <div style="font-size:0.7rem; color:#aaa;">PM</div>
-            <div class="status-box">${item.pm || '-'}</div>
+          <div class="slots">
+            <div class="slot">
+              <div class="slot-label">AM</div>
+              <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am}</div>
+            </div>
+            <div class="slot">
+              <div class="slot-label">PM</div>
+              <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm}</div>
+            </div>
           </div>
         </div>
       `).join('');
     } catch (e) {
-      container.innerHTML = "データの読み込みに失敗しました。";
+      container.innerHTML = "データの取得に失敗しました。時間をおいて再度お試しください。";
     }
   }
   loadData();
