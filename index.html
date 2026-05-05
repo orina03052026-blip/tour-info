@@ -23,45 +23,43 @@
   </style>
 </head>
 <body>
+  <div class="staff-grid" id="container">読み込み中...</div>
+  <script>
+    // ★ここに【ステップ1】でコピーした新しいURLを貼り付けてください★
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycby28QKEDNlMN_ZhvsqQna6GLeZGbGKu7Z848OOj-vKDH8tI0jxrP8SaEYA0E_mPfz6E/exec;
 
-<div class="staff-grid" id="container">読み込み中...</div>
-
-<script>
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
-  async function loadData() {
-    const container = document.getElementById('container');
-    try {
-      const response = await fetch(GAS_URL);
-      const data = await response.json();
-      
-      if (data.length === 0) {
-        container.innerHTML = "表示できる予約データがありません。";
-        return;
+    async function loadData() {
+      const container = document.getElementById('container');
+      try {
+        const response = await fetch(GAS_URL);
+        const data = await response.json();
+        if (!data || data.length === 0) {
+          container.innerHTML = "表示できるデータがありません。";
+          return;
+        }
+        container.innerHTML = data.map(item => `
+          <div class="staff-card">
+            <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
+              <div class="staff-name">${item.staff || 'Staff'}</div>
+              <div class="tour-date">${item.date || ''}</div>
+            </div>
+            <div class="slots">
+              <div class="slot">
+                <div class="slot-label">AM</div>
+                <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am || '-'}</div>
+              </div>
+              <div class="slot">
+                <div class="slot-label">PM</div>
+                <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm || '-'}</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = "データの読み込みに失敗しました。";
       }
-
-      container.innerHTML = data.map(item => `
-        <div class="staff-card">
-          <div class="staff-header ${item.staff.toLowerCase() === 'kana' ? 'kana' : 'sho'}">
-            <div class="staff-name">${item.staff}</div>
-            <div class="tour-date">${item.date}</div>
-          </div>
-          <div class="slots">
-            <div class="slot">
-              <div class="slot-label">AM</div>
-              <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am}</div>
-            </div>
-            <div class="slot">
-              <div class="slot-label">PM</div>
-              <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm}</div>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    } catch (e) {
-      container.innerHTML = "データの取得に失敗しました。時間をおいて再度お試しください。";
     }
-  }
-  loadData();
-</script>
+    loadData();
+  </script>
 </body>
 </html>
