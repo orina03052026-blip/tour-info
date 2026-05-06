@@ -8,15 +8,15 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f7fa; padding: 20px; color: #333; }
     .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; max-width: 1000px; margin: 0 auto; }
-    .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+    .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e1e8ed; }
     .staff-header { padding: 20px; text-align: center; color: white; }
     .staff-header.kana { background: linear-gradient(135deg, #ff7eb3, #ff758c); }
     .staff-header.sho { background: linear-gradient(135deg, #2af598, #009efd); }
     .staff-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; }
-    .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 15px; display: inline-block; }
+    .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.25); border-radius: 8px; padding: 5px 20px; display: inline-block; }
     .slots { padding: 20px; }
     .slot { margin-bottom: 20px; }
-    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
     select.booking-select { 
       width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #ddd; 
       font-size: 0.95rem; cursor: pointer; background-color: #fff; transition: all 0.3s;
@@ -26,11 +26,11 @@
   </style>
 </head>
 <body>
-<div class="staff-grid" id="container">Loading availability...</div>
+<div class="staff-grid" id="container">Updating today's availability...</div>
 
 <script>
-  // ★ GASで「新しいデプロイ」をした後のURLに書き換えてください
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyynq9wdSQAVCpwN6Fg9Nc8MJPHuDPpsgsnpuvNAslNXR19uQdN-gzI7MIqdWswOR6u/exec';
+  // ★ GASで「新しいデプロイ」をした後の最新URLをここに
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
 
   const tourInfo = [
     { name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
@@ -49,13 +49,11 @@
   }
 
   function createSelectHtml(kyuVal, shikamaVal, castleVal) {
-    // 「休み」や「休」が含まれている場合は一律で休み表示
-    const isDayOff = [kyuVal, shikamaVal, castleVal].some(v => String(v).includes("休"));
+    const isDayOff = [kyuVal, shikamaVal, castleVal].some(v => String(v).includes("休") || String(v).includes("休み"));
     if (isDayOff) {
       return `<select class="booking-select busy" disabled><option>Not Available (Day Off)</option></select>`;
     }
 
-    // すでに予約が入っているコースを探す（数値が入っているかチェック）
     let activeTour = null;
     if (kyuVal && !isNaN(kyuVal) && Number(kyuVal) > 0) activeTour = tourInfo[0];
     else if (shikamaVal && !isNaN(shikamaVal) && Number(shikamaVal) > 0) activeTour = tourInfo[1];
@@ -81,6 +79,12 @@
     try {
       const response = await fetch(GAS_URL);
       const data = await response.json();
+      
+      if (data.length === 0) {
+        container.innerHTML = "<div style='grid-column:1/-1; text-align:center;'>No tours scheduled for today and tomorrow.</div>";
+        return;
+      }
+
       container.innerHTML = data.map(item => `
         <div class="staff-card">
           <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
@@ -88,14 +92,8 @@
             <div class="tour-date">${formatInboundDate(item.date)}</div>
           </div>
           <div class="slots">
-            <div class="slot">
-              <div class="slot-label">Morning (AM)</div>
-              ${createSelectHtml(item.am_kyu, item.am_shikama, item.am_castle)}
-            </div>
-            <div class="slot">
-              <div class="slot-label">Afternoon (PM)</div>
-              ${createSelectHtml(item.pm_kyu, item.pm_shikama, item.pm_castle)}
-            </div>
+            <div class="slot"><div class="slot-label">Morning (AM)</div>${createSelectHtml(item.am_kyu, item.am_shikama, item.am_castle)}</div>
+            <div class="slot"><div class="slot-label">Afternoon (PM)</div>${createSelectHtml(item.pm_kyu, item.pm_shikama, item.pm_castle)}</div>
           </div>
         </div>
       `).join('');
