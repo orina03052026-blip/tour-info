@@ -29,7 +29,42 @@
 <div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbx6LcTrGMXjAvcg1vbbRMqdE024Ha2jSRd_4ekgVORu6_b_fnH_j6X0x7MhuXDP7sul/exec';
+  const GAS_URL = 'function doGet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheets()[0];
+  const rows = sheet.getDataRange().getValues();
+  const results = [];
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowDate = new Date(rows[i][0]);
+    rowDate.setHours(0,0,0,0);
+
+    if (
+      rowDate.getTime() === today.getTime() ||
+      rowDate.getTime() === tomorrow.getTime()
+    ) {
+      results.push({
+        date: rows[i][0],
+        staff: rows[i][1],
+        am_kyu: rows[i][3],
+        pm_kyu: rows[i][5],
+        am_shikama: rows[i][7],
+        pm_shikama: rows[i][9],
+        am_castle: rows[i][11],
+        pm_castle: rows[i][13]
+      });
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(results))
+    .setMimeType(ContentService.MimeType.JSON);
+}';
 
   const tourInfo = [
     { id: 'kyu', name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
