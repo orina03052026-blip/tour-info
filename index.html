@@ -96,12 +96,15 @@
           </div>
         </div>
       `).join('');
-    } catch {
-      container.innerHTML = "Error loading data";
+    } catch (e) {
+  console.error(e);
+  container.innerHTML = "Error loading data";
+}
     }
   }
 
-  loadData();
+  loadData(
+  );
 </script>
 
 </body>
