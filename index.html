@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,84 +7,97 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f7fa; padding: 20px; color: #333; }
-    .controls { max-width: 1000px; margin: 0 auto 20px; display: flex; justify-content: center; }
-    select { padding: 10px 20px; font-size: 1rem; border-radius: 10px; border: 1px solid #ddd; outline: none; background: white; cursor: pointer; }
-    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
-    .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; max-width: 1000px; margin: 0 auto; }
+    .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
     .staff-header { padding: 20px; text-align: center; color: white; }
     .staff-header.kana { background: linear-gradient(135deg, #ff7eb3, #ff758c); }
     .staff-header.sho { background: linear-gradient(135deg, #2af598, #009efd); }
     .staff-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; }
-    .tour-date { font-size: 1rem; opacity: 0.9; }
+    
+    /* 日付を大きく、インバウンド向けに */
+    .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 15px; display: inline-block; }
+    
     .slots { padding: 20px; }
-    .slot { margin-bottom: 15px; }
-    .slot-label { font-size: 0.8rem; color: #888; text-transform: uppercase; margin-bottom: 5px; }
-    .status-badge { padding: 12px; border-radius: 12px; text-align: center; font-weight: bold; font-size: 1.1rem; background: #f8f9fa; border: 1px solid #eee; }
-    .status-available { background: #e6fffa; color: #00a388; border-color: #b2f5ea; }
-    .status-busy { background: #fff5f5; color: #e53e3e; border-color: #feb2b2; }
+    .slot { margin-bottom: 20px; }
+    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; }
+    
+    /* プルダウンのスタイルを以前のように */
+    select.booking-select { 
+      width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #ddd; 
+      font-size: 1rem; cursor: pointer; background-color: #fff;
+      transition: all 0.3s;
+    }
+    select.booking-select.available { border-color: #00a388; color: #00a388; background-color: #f0fff4; font-weight: bold; }
+    select.booking-select.busy { border-color: #e53e3e; color: #e53e3e; background-color: #fff5f5; opacity: 0.7; pointer-events: none; }
   </style>
 </head>
 <body>
 
-<div class="controls">
-  <select id="staffFilter" onchange="renderData()">
-    <option value="all">すべてのスタッフ</option>
-    <option value="Kana">Kana</option>
-    <option value="Sho">Sho</option>
-  </select>
-</div>
-
-<div class="staff-grid" id="container">読み込み中...</div>
+<div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
-  // ★最新のURLに書き換えてください
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
-  let allData = [];
+
+  // 日付を Day/Month の形式に変換する関数
+  function formatInboundDate(dateStr) {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = d.getDate();
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day}/${monthNames[d.getMonth()]}`;
+    } catch(e) { return dateStr; }
+  }
 
   async function loadData() {
     const container = document.getElementById('container');
     try {
       const response = await fetch(GAS_URL);
-      allData = await response.json();
-      renderData();
+      const data = await response.json();
+      
+      container.innerHTML = data.map(item => {
+        const formattedDate = formatInboundDate(item.date);
+        const isAMAvailable = item.am === '予約可能';
+        const isPMAvailable = item.pm === '予約可能';
+
+        return `
+        <div class="staff-card">
+          <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
+            <div class="staff-name">${item.staff}</div>
+            <div class="tour-date">${formattedDate}</div>
+          </div>
+          <div class="slots">
+            <!-- AM Slot -->
+            <div class="slot">
+              <div class="slot-label">MORNING (AM)</div>
+              <select class="booking-select ${isAMAvailable ? 'available' : 'busy'}" onchange="if(this.value) window.open(this.value, '_blank')">
+                <option value="">${isAMAvailable ? '▼ Select a Tour' : 'Not Available'}</option>
+                ${isAMAvailable ? `
+                  <option value="https://www.travel-network-act.co.jp/local/en/castle-town/">e-bike Ride around the Castle, Slurp Like a Local</option>
+                  <option value="https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/">e-bike Ride to the Sea, Slurp Like a Local</option>
+                  <option value="https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/">Himeji castle guide tour</option>
+                ` : ''}
+              </select>
+            </div>
+            <!-- PM Slot -->
+            <div class="slot">
+              <div class="slot-label">AFTERNOON (PM)</div>
+              <select class="booking-select ${isPMAvailable ? 'available' : 'busy'}" onchange="if(this.value) window.open(this.value, '_blank')">
+                <option value="">${isPMAvailable ? '▼ Select a Tour' : 'Not Available'}</option>
+                ${isPMAvailable ? `
+                  <option value="https://www.travel-network-act.co.jp/local/en/castle-town/">e-bike Ride around the Castle, Slurp Like a Local</option>
+                  <option value="https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/">e-bike Ride to the Sea, Slurp Like a Local</option>
+                  <option value="https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/">Himeji castle guide tour</option>
+                ` : ''}
+              </select>
+            </div>
+          </div>
+        </div>
+      `}).join('');
     } catch (e) {
-      container.innerHTML = "データの読み込みに失敗しました。";
+      container.innerHTML = "Error loading data.";
     }
   }
-
-  function renderData() {
-    const container = document.getElementById('container');
-    const filter = document.getElementById('staffFilter').value;
-    
-    const filteredData = filter === 'all' 
-      ? allData 
-      : allData.filter(item => item.staff === filter);
-
-    if (filteredData.length === 0) {
-      container.innerHTML = "表示できるデータがありません。";
-      return;
-    }
-
-    container.innerHTML = filteredData.map(item => `
-      <div class="staff-card">
-        <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
-          <div class="staff-name">${item.staff}</div>
-          <div class="tour-date">${item.date}</div>
-        </div>
-        <div class="slots">
-          <div class="slot">
-            <div class="slot-label">AM</div>
-            <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am}</div>
-          </div>
-          <div class="slot">
-            <div class="slot-label">PM</div>
-            <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm}</div>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
   loadData();
 </script>
 </body>
