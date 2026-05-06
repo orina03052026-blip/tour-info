@@ -26,45 +26,12 @@
   </style>
 </head>
 <body>
+
 <div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
-  const GAS_URL = 'function doGet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheets()[0];
-  const rows = sheet.getDataRange().getValues();
-  const results = [];
-
-  const today = new Date();
-  today.setHours(0,0,0,0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  for (let i = 1; i < rows.length; i++) {
-    const rowDate = new Date(rows[i][0]);
-    rowDate.setHours(0,0,0,0);
-
-    if (
-      rowDate.getTime() === today.getTime() ||
-      rowDate.getTime() === tomorrow.getTime()
-    ) {
-      results.push({
-        date: rows[i][0],
-        staff: rows[i][1],
-        am_kyu: rows[i][3],
-        pm_kyu: rows[i][5],
-        am_shikama: rows[i][7],
-        pm_shikama: rows[i][9],
-        am_castle: rows[i][11],
-        pm_castle: rows[i][13]
-      });
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(results))
-    .setMimeType(ContentService.MimeType.JSON);
-}';
+  // ★ ここはURLだけ
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycby7GsoS7igT4GWLRU5ThNRKy6Osnh2WK74aUn7-keFuUTAuZtsmNrEbNfvhS1XmKrJ6/exec';
 
   const tourInfo = [
     { id: 'kyu', name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
@@ -73,51 +40,44 @@
   ];
 
   function formatInboundDate(dateStr) {
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      const day = d.getDate();
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      return `${day}/${monthNames[d.getMonth()]}`;
-    } catch(e) { return dateStr; }
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    const day = d.getDate();
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${day}/${monthNames[d.getMonth()]}`;
   }
 
-  // スプレッドシートの各列のデータを受け取ってプルダウンを作る関数
   function createSelectHtml(kyuVal, shikamaVal, castleVal) {
-    // どれかが「休み」なら表示
     if (kyuVal === "休み" || shikamaVal === "休み" || castleVal === "休み") {
       return `<select class="booking-select busy" disabled><option>Day Off / Not Available</option></select>`;
     }
 
-    // すでに予約が入っているコースを探す（数値が入っているかチェック）
     let activeTour = null;
     if (kyuVal && !isNaN(kyuVal)) activeTour = tourInfo[0];
     else if (shikamaVal && !isNaN(shikamaVal)) activeTour = tourInfo[1];
     else if (castleVal && !isNaN(castleVal)) activeTour = tourInfo[2];
 
     if (activeTour) {
-      // 予約がある場合、そのツアーだけを選択肢に出す
       return `
         <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
           <option value="">▼ Ongoing: ${activeTour.name}</option>
-          <option value="${activeTour.url}">Join this tour (Book Now)</option>
-        </select>`;
-    } else {
-      // 全て空（または0）の場合、全コース表示
-      return `
-        <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
-          <option value="">▼ Select a Tour</option>
-          ${tourInfo.map(t => `<option value="${t.url}">${t.name}</option>`).join('')}
+          <option value="${activeTour.url}">Join this tour</option>
         </select>`;
     }
+
+    return `
+      <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
+        <option value="">▼ Select a Tour</option>
+        ${tourInfo.map(t => `<option value="${t.url}">${t.name}</option>`).join('')}
+      </select>`;
   }
 
   async function loadData() {
     const container = document.getElementById('container');
     try {
-      const response = await fetch(GAS_URL);
-      const data = await response.json();
-      // GAS側が画像のスプレッドシートの列順でデータを返していることを前提にしています
+      const res = await fetch(GAS_URL);
+      const data = await res.json();
+
       container.innerHTML = data.map(item => `
         <div class="staff-card">
           <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
@@ -136,9 +96,13 @@
           </div>
         </div>
       `).join('');
-    } catch (e) { container.innerHTML = "Error loading data."; }
+    } catch {
+      container.innerHTML = "Error loading data";
+    }
   }
+
   loadData();
 </script>
+
 </body>
 </html>
