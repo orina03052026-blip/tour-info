@@ -16,7 +16,7 @@
     .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 15px; display: inline-block; }
     .slots { padding: 20px; }
     .slot { margin-bottom: 20px; }
-    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; }
+    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
     select.booking-select { 
       width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #ddd; 
       font-size: 0.95rem; cursor: pointer; background-color: #fff; transition: all 0.3s;
@@ -29,12 +29,13 @@
 <div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
+  // ★ GASで「新しいデプロイ」をした後のURLに書き換えてください
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
 
-  const tours = [
+  const tourInfo = [
     { name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
     { name: "e-bike Ride to the Sea, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/" },
-    { name: "Himeji castle guide tour", url: "https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/" }
+    { name: "Himeji Castle Guide Tour", url: "https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/" }
   ];
 
   function formatInboundDate(dateStr) {
@@ -47,30 +48,32 @@
     } catch(e) { return dateStr; }
   }
 
-  function createSelectHtml(status) {
-    if (!status) return `<select class="booking-select busy" disabled><option>Not Available</option></select>`;
-    
-    // スプレッドシートが「予約可能」の場合：全コース表示
-    if (status === "予約可能") {
+  function createSelectHtml(kyuVal, shikamaVal, castleVal) {
+    // 「休み」や「休」が含まれている場合は一律で休み表示
+    const isDayOff = [kyuVal, shikamaVal, castleVal].some(v => String(v).includes("休"));
+    if (isDayOff) {
+      return `<select class="booking-select busy" disabled><option>Not Available (Day Off)</option></select>`;
+    }
+
+    // すでに予約が入っているコースを探す（数値が入っているかチェック）
+    let activeTour = null;
+    if (kyuVal && !isNaN(kyuVal) && Number(kyuVal) > 0) activeTour = tourInfo[0];
+    else if (shikamaVal && !isNaN(shikamaVal) && Number(shikamaVal) > 0) activeTour = tourInfo[1];
+    else if (castleVal && !isNaN(castleVal) && Number(castleVal) > 0) activeTour = tourInfo[2];
+
+    if (activeTour) {
+      return `
+        <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
+          <option value="">▼ Ongoing: ${activeTour.name}</option>
+          <option value="${activeTour.url}">Join this tour (Book Now)</option>
+        </select>`;
+    } else {
       return `
         <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
           <option value="">▼ Select a Tour</option>
-          ${tours.map(t => `<option value="${t.url}">${t.name}</option>`).join('')}
-        </select>`;
-    } 
-    
-    // すでに特定のツアー名が入っている場合：そのツアーだけを表示
-    const reservedTour = tours.find(t => status.includes(t.name));
-    if (reservedTour) {
-      return `
-        <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
-          <option value="">▼ Ongoing: ${reservedTour.name}</option>
-          <option value="${reservedTour.url}">Join this tour (Book Now)</option>
+          ${tourInfo.map(t => `<option value="${t.url}">${t.name}</option>`).join('')}
         </select>`;
     }
-
-    // それ以外（満員・不可など）
-    return `<select class="booking-select busy" disabled><option>${status}</option></select>`;
   }
 
   async function loadData() {
@@ -85,12 +88,18 @@
             <div class="tour-date">${formatInboundDate(item.date)}</div>
           </div>
           <div class="slots">
-            <div class="slot"><div class="slot-label">MORNING (AM)</div>${createSelectHtml(item.am)}</div>
-            <div class="slot"><div class="slot-label">AFTERNOON (PM)</div>${createSelectHtml(item.pm)}</div>
+            <div class="slot">
+              <div class="slot-label">Morning (AM)</div>
+              ${createSelectHtml(item.am_kyu, item.am_shikama, item.am_castle)}
+            </div>
+            <div class="slot">
+              <div class="slot-label">Afternoon (PM)</div>
+              ${createSelectHtml(item.pm_kyu, item.pm_shikama, item.pm_castle)}
+            </div>
           </div>
         </div>
       `).join('');
-    } catch (e) { container.innerHTML = "Error loading data."; }
+    } catch (e) { container.innerHTML = "Error loading availability."; }
   }
   loadData();
 </script>
