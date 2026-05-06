@@ -7,6 +7,8 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f7fa; padding: 20px; color: #333; }
+    .controls { max-width: 1000px; margin: 0 auto 20px; display: flex; justify-content: center; }
+    select { padding: 10px 20px; font-size: 1rem; border-radius: 10px; border: 1px solid #ddd; outline: none; background: white; cursor: pointer; }
     .staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
     .staff-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
     .staff-header { padding: 20px; text-align: center; color: white; }
@@ -23,43 +25,67 @@
   </style>
 </head>
 <body>
-  <div class="staff-grid" id="container">読み込み中...</div>
-  <script>
-    // ★ここに【ステップ1】でコピーした新しいURLを貼り付けてください★
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycby28QKEDNlMN_ZhvsqQna6GLeZGbGKu7Z848OOj-vKDH8tI0jxrP8SaEYA0E_mPfz6E/exec;
 
-    async function loadData() {
-      const container = document.getElementById('container');
-      try {
-        const response = await fetch(GAS_URL);
-        const data = await response.json();
-        if (!data || data.length === 0) {
-          container.innerHTML = "表示できるデータがありません。";
-          return;
-        }
-        container.innerHTML = data.map(item => `
-          <div class="staff-card">
-            <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
-              <div class="staff-name">${item.staff || 'Staff'}</div>
-              <div class="tour-date">${item.date || ''}</div>
-            </div>
-            <div class="slots">
-              <div class="slot">
-                <div class="slot-label">AM</div>
-                <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am || '-'}</div>
-              </div>
-              <div class="slot">
-                <div class="slot-label">PM</div>
-                <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm || '-'}</div>
-              </div>
-            </div>
-          </div>
-        `).join('');
-      } catch (e) {
-        container.innerHTML = "データの読み込みに失敗しました。";
-      }
+<div class="controls">
+  <select id="staffFilter" onchange="renderData()">
+    <option value="all">すべてのスタッフ</option>
+    <option value="Kana">Kana</option>
+    <option value="Sho">Sho</option>
+  </select>
+</div>
+
+<div class="staff-grid" id="container">読み込み中...</div>
+
+<script>
+  // ★最新のURLに書き換えてください
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
+  let allData = [];
+
+  async function loadData() {
+    const container = document.getElementById('container');
+    try {
+      const response = await fetch(GAS_URL);
+      allData = await response.json();
+      renderData();
+    } catch (e) {
+      container.innerHTML = "データの読み込みに失敗しました。";
     }
-    loadData();
-  </script>
+  }
+
+  function renderData() {
+    const container = document.getElementById('container');
+    const filter = document.getElementById('staffFilter').value;
+    
+    const filteredData = filter === 'all' 
+      ? allData 
+      : allData.filter(item => item.staff === filter);
+
+    if (filteredData.length === 0) {
+      container.innerHTML = "表示できるデータがありません。";
+      return;
+    }
+
+    container.innerHTML = filteredData.map(item => `
+      <div class="staff-card">
+        <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
+          <div class="staff-name">${item.staff}</div>
+          <div class="tour-date">${item.date}</div>
+        </div>
+        <div class="slots">
+          <div class="slot">
+            <div class="slot-label">AM</div>
+            <div class="status-badge ${item.am === '予約可能' ? 'status-available' : 'status-busy'}">${item.am}</div>
+          </div>
+          <div class="slot">
+            <div class="slot-label">PM</div>
+            <div class="status-badge ${item.pm === '予約可能' ? 'status-available' : 'status-busy'}">${item.pm}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  loadData();
+</script>
 </body>
 </html>
