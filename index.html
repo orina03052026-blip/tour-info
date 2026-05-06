@@ -13,32 +13,30 @@
     .staff-header.kana { background: linear-gradient(135deg, #ff7eb3, #ff758c); }
     .staff-header.sho { background: linear-gradient(135deg, #2af598, #009efd); }
     .staff-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; }
-    
-    /* 日付を大きく、インバウンド向けに */
     .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 15px; display: inline-block; }
-    
     .slots { padding: 20px; }
     .slot { margin-bottom: 20px; }
-    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; }
-    
-    /* プルダウンのスタイルを以前のように */
+    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; }
     select.booking-select { 
       width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #ddd; 
-      font-size: 1rem; cursor: pointer; background-color: #fff;
-      transition: all 0.3s;
+      font-size: 0.95rem; cursor: pointer; background-color: #fff; transition: all 0.3s;
     }
     select.booking-select.available { border-color: #00a388; color: #00a388; background-color: #f0fff4; font-weight: bold; }
-    select.booking-select.busy { border-color: #e53e3e; color: #e53e3e; background-color: #fff5f5; opacity: 0.7; pointer-events: none; }
+    select.booking-select.busy { border-color: #e53e3e; color: #e53e3e; background-color: #fff5f5; opacity: 0.7; }
   </style>
 </head>
 <body>
-
 <div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzC33218ENr7m3sfVDsh1Um6M-xXz-tgGqyhr4N5hrQnwhufScaZ6nDPxPrELNSFzBf/exec';
 
-  // 日付を Day/Month の形式に変換する関数
+  const tours = [
+    { name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
+    { name: "e-bike Ride to the Sea, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/" },
+    { name: "Himeji castle guide tour", url: "https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/" }
+  ];
+
   function formatInboundDate(dateStr) {
     try {
       const d = new Date(dateStr);
@@ -49,54 +47,50 @@
     } catch(e) { return dateStr; }
   }
 
+  function createSelectHtml(status) {
+    if (!status) return `<select class="booking-select busy" disabled><option>Not Available</option></select>`;
+    
+    // スプレッドシートが「予約可能」の場合：全コース表示
+    if (status === "予約可能") {
+      return `
+        <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
+          <option value="">▼ Select a Tour</option>
+          ${tours.map(t => `<option value="${t.url}">${t.name}</option>`).join('')}
+        </select>`;
+    } 
+    
+    // すでに特定のツアー名が入っている場合：そのツアーだけを表示
+    const reservedTour = tours.find(t => status.includes(t.name));
+    if (reservedTour) {
+      return `
+        <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
+          <option value="">▼ Ongoing: ${reservedTour.name}</option>
+          <option value="${reservedTour.url}">Join this tour (Book Now)</option>
+        </select>`;
+    }
+
+    // それ以外（満員・不可など）
+    return `<select class="booking-select busy" disabled><option>${status}</option></select>`;
+  }
+
   async function loadData() {
     const container = document.getElementById('container');
     try {
       const response = await fetch(GAS_URL);
       const data = await response.json();
-      
-      container.innerHTML = data.map(item => {
-        const formattedDate = formatInboundDate(item.date);
-        const isAMAvailable = item.am === '予約可能';
-        const isPMAvailable = item.pm === '予約可能';
-
-        return `
+      container.innerHTML = data.map(item => `
         <div class="staff-card">
           <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
             <div class="staff-name">${item.staff}</div>
-            <div class="tour-date">${formattedDate}</div>
+            <div class="tour-date">${formatInboundDate(item.date)}</div>
           </div>
           <div class="slots">
-            <!-- AM Slot -->
-            <div class="slot">
-              <div class="slot-label">MORNING (AM)</div>
-              <select class="booking-select ${isAMAvailable ? 'available' : 'busy'}" onchange="if(this.value) window.open(this.value, '_blank')">
-                <option value="">${isAMAvailable ? '▼ Select a Tour' : 'Not Available'}</option>
-                ${isAMAvailable ? `
-                  <option value="https://www.travel-network-act.co.jp/local/en/castle-town/">e-bike Ride around the Castle, Slurp Like a Local</option>
-                  <option value="https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/">e-bike Ride to the Sea, Slurp Like a Local</option>
-                  <option value="https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/">Himeji castle guide tour</option>
-                ` : ''}
-              </select>
-            </div>
-            <!-- PM Slot -->
-            <div class="slot">
-              <div class="slot-label">AFTERNOON (PM)</div>
-              <select class="booking-select ${isPMAvailable ? 'available' : 'busy'}" onchange="if(this.value) window.open(this.value, '_blank')">
-                <option value="">${isPMAvailable ? '▼ Select a Tour' : 'Not Available'}</option>
-                ${isPMAvailable ? `
-                  <option value="https://www.travel-network-act.co.jp/local/en/castle-town/">e-bike Ride around the Castle, Slurp Like a Local</option>
-                  <option value="https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/">e-bike Ride to the Sea, Slurp Like a Local</option>
-                  <option value="https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/">Himeji castle guide tour</option>
-                ` : ''}
-              </select>
-            </div>
+            <div class="slot"><div class="slot-label">MORNING (AM)</div>${createSelectHtml(item.am)}</div>
+            <div class="slot"><div class="slot-label">AFTERNOON (PM)</div>${createSelectHtml(item.pm)}</div>
           </div>
         </div>
-      `}).join('');
-    } catch (e) {
-      container.innerHTML = "Error loading data.";
-    }
+      `).join('');
+    } catch (e) { container.innerHTML = "Error loading data."; }
   }
   loadData();
 </script>
