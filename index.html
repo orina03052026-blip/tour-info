@@ -136,7 +136,7 @@ function createSelectHtml(kyuVal, shikamaVal, castleVal) {
   if (activeTour) {
     return `
       <select class="booking-select available"
-        onchange="if(this.value) location.href=this.value">
+  onchange="if(this.value) window.top.location.href=this.value">
         <option value="">▼ Ongoing: ${activeTour.name} (Max ${activeTour.cap})</option>
         <option value="${activeTour.url}">Join this tour</option>
       </select>`;
@@ -144,8 +144,8 @@ function createSelectHtml(kyuVal, shikamaVal, castleVal) {
 
   // ★ 全ツアー表示
   return `
-    <select class="booking-select available"
-      onchange="if(this.value) location.href=this.value">
+   <select class="booking-select available"
+  onchange="if(this.value) window.top.location.href=this.value">
       <option value="">▼ Select a Tour</option>
       ${tourInfo.map(t => `
         <option value="${t.url}">
