@@ -16,7 +16,7 @@
     .tour-date { font-size: 1.4rem; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 15px; display: inline-block; }
     .slots { padding: 20px; }
     .slot { margin-bottom: 20px; }
-    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+    .slot-label { font-size: 0.9rem; color: #666; font-weight: bold; margin-bottom: 8px; }
     select.booking-select { 
       width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #ddd; 
       font-size: 0.95rem; cursor: pointer; background-color: #fff; transition: all 0.3s;
@@ -29,13 +29,12 @@
 <div class="staff-grid" id="container">Loading availability...</div>
 
 <script>
-  // ★ GASで「新しいデプロイ」をした後のURLに書き換えてください
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwVzcTnQPbKclEHzthnmgnLNbbp4fQqh-iBBdtjJGszY_PEeoqsAx7VxBPoXwlFup4b/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmCpwfh8YRxiesAcv4m2WKEw7vLcIiOybWJVpmQW4mG58D0wP2KH_6UShI5nsgvNuA/exec';
 
   const tourInfo = [
-    { name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
-    { name: "e-bike Ride to the Sea, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/" },
-    { name: "Himeji Castle Guide Tour", url: "https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/" }
+    { id: 'kyu', name: "e-bike Ride around the Castle, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/castle-town/" },
+    { id: 'shikama', name: "e-bike Ride to the Sea, Slurp Like a Local", url: "https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/" },
+    { id: 'castle', name: "Himeji castle guide tour", url: "https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/" }
   ];
 
   function formatInboundDate(dateStr) {
@@ -48,26 +47,28 @@
     } catch(e) { return dateStr; }
   }
 
+  // スプレッドシートの各列のデータを受け取ってプルダウンを作る関数
   function createSelectHtml(kyuVal, shikamaVal, castleVal) {
-    // 「休み」や「休」が含まれている場合は一律で休み表示
-    const isDayOff = [kyuVal, shikamaVal, castleVal].some(v => String(v).includes("休"));
-    if (isDayOff) {
-      return `<select class="booking-select busy" disabled><option>Not Available (Day Off)</option></select>`;
+    // どれかが「休み」なら表示
+    if (kyuVal === "休み" || shikamaVal === "休み" || castleVal === "休み") {
+      return `<select class="booking-select busy" disabled><option>Day Off / Not Available</option></select>`;
     }
 
     // すでに予約が入っているコースを探す（数値が入っているかチェック）
     let activeTour = null;
-    if (kyuVal && !isNaN(kyuVal) && Number(kyuVal) > 0) activeTour = tourInfo[0];
-    else if (shikamaVal && !isNaN(shikamaVal) && Number(shikamaVal) > 0) activeTour = tourInfo[1];
-    else if (castleVal && !isNaN(castleVal) && Number(castleVal) > 0) activeTour = tourInfo[2];
+    if (kyuVal && !isNaN(kyuVal)) activeTour = tourInfo[0];
+    else if (shikamaVal && !isNaN(shikamaVal)) activeTour = tourInfo[1];
+    else if (castleVal && !isNaN(castleVal)) activeTour = tourInfo[2];
 
     if (activeTour) {
+      // 予約がある場合、そのツアーだけを選択肢に出す
       return `
         <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
           <option value="">▼ Ongoing: ${activeTour.name}</option>
           <option value="${activeTour.url}">Join this tour (Book Now)</option>
         </select>`;
     } else {
+      // 全て空（または0）の場合、全コース表示
       return `
         <select class="booking-select available" onchange="if(this.value) window.open(this.value, '_blank')">
           <option value="">▼ Select a Tour</option>
@@ -81,6 +82,7 @@
     try {
       const response = await fetch(GAS_URL);
       const data = await response.json();
+      // GAS側が画像のスプレッドシートの列順でデータを返していることを前提にしています
       container.innerHTML = data.map(item => `
         <div class="staff-card">
           <div class="staff-header ${(item.staff || '').toLowerCase() === 'kana' ? 'kana' : 'sho'}">
@@ -89,17 +91,17 @@
           </div>
           <div class="slots">
             <div class="slot">
-              <div class="slot-label">Morning (AM)</div>
+              <div class="slot-label">MORNING (AM)</div>
               ${createSelectHtml(item.am_kyu, item.am_shikama, item.am_castle)}
             </div>
             <div class="slot">
-              <div class="slot-label">Afternoon (PM)</div>
+              <div class="slot-label">AFTERNOON (PM)</div>
               ${createSelectHtml(item.pm_kyu, item.pm_shikama, item.pm_castle)}
             </div>
           </div>
         </div>
       `).join('');
-    } catch (e) { container.innerHTML = "Error loading availability."; }
+    } catch (e) { container.innerHTML = "Error loading data."; }
   }
   loadData();
 </script>
