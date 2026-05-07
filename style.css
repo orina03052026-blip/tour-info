@@ -15,6 +15,28 @@ body {
   line-height: 1.4;
 }
 
+.page-header {
+  max-width: 960px;
+  margin: 0 auto 16px;
+  padding: 4px 4px 0;
+  text-align: center;
+}
+
+.page-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1f3a4a;
+  letter-spacing: 0.2px;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.page-subtitle {
+  font-size: 0.9rem;
+  color: #5b7280;
+  line-height: 1.4;
+}
+
 .day-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -146,6 +168,9 @@ body {
 
 @media (max-width: 480px) {
   body { padding: 8px; font-size: 13px; }
+  .page-header { margin-bottom: 12px; }
+  .page-title { font-size: 1.15rem; }
+  .page-subtitle { font-size: 0.82rem; }
   .day-grid { gap: 12px; }
   .day-header { padding: 12px 14px; }
   .day-date { font-size: 1.2rem; }
