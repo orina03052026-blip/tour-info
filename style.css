@@ -125,9 +125,7 @@ body {
 .tour-button:hover { opacity: 0.85; }
 
 .tour-card.fully-booked .tour-button {
-  background: #aaa;
-  pointer-events: none;
-  cursor: not-allowed;
+  background: #888;
 }
 
 .empty-message {
