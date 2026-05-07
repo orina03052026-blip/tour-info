@@ -1,0 +1,157 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: #f0f7fa;
+  padding: 12px;
+  color: #333;
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  line-height: 1.4;
+}
+
+.day-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.day-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-header {
+  padding: 14px 18px;
+  color: white;
+  background: linear-gradient(135deg, #2af598, #009efd);
+}
+
+.day-header.tomorrow {
+  background: linear-gradient(135deg, #ff7eb3, #ff758c);
+}
+
+.day-label {
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.day-date {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.timeslot {
+  padding: 14px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.timeslot:first-of-type {
+  border-top: none;
+}
+
+.timeslot-label {
+  font-size: 0.78rem;
+  color: #888;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.tour-card {
+  border: 1px solid #e3ecef;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fafdfd;
+}
+
+.tour-card:last-child { margin-bottom: 0; }
+
+.tour-card.fully-booked {
+  opacity: 0.55;
+  background: #f3f3f3;
+}
+
+.tour-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.tour-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.status-available { background: #e6fffa; color: #00876a; }
+.status-warning   { background: #fff7e0; color: #b8730d; }
+.status-fully     { background: #fde8e8; color: #b42424; }
+
+.tour-button {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 10px;
+  border-radius: 10px;
+  background: #009efd;
+  color: #fff;
+  font-weight: bold;
+  font-size: 0.85rem;
+  transition: opacity 0.2s;
+}
+
+.tour-button:hover { opacity: 0.85; }
+
+.tour-card.fully-booked .tour-button {
+  background: #aaa;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-style: italic;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.no-tours-in-slot {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.85rem;
+  padding: 6px 0 2px;
+}
+
+@media (max-width: 480px) {
+  body { padding: 8px; font-size: 13px; }
+  .day-grid { gap: 12px; }
+  .day-header { padding: 12px 14px; }
+  .day-date { font-size: 1.2rem; }
+  .timeslot { padding: 12px; }
+  .tour-card { padding: 10px; }
+  .tour-name { font-size: 0.9rem; }
+}
