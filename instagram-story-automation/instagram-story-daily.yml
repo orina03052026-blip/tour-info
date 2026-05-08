@@ -1,0 +1,137 @@
+name: Instagram Story Daily Auto-Post
+
+on:
+  # 毎日 0:00 JST に実行
+  # （UTC-9 なので、UTC 15:00 = JST 0:00）
+  schedule:
+    - cron: '0 15 * * *'
+  
+  # 手動トリガー（テスト用）
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - test
+          - generate-only
+          - post-only
+
+jobs:
+  post-instagram-story:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ========================================
+      # リポジトリをチェックアウト
+      # ========================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ========================================
+      # Node.js 環境をセットアップ
+      # ========================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'instagram-story-automation/package.json'
+
+      # ========================================
+      # 依存パッケージをインストール
+      # ========================================
+      - name: Install dependencies
+        working-directory: instagram-story-automation
+        run: npm install
+
+      # ========================================
+      # 実行モード判定
+      # ========================================
+      - name: Determine execution mode
+        id: mode
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "mode=full" >> $GITHUB_OUTPUT
+          else
+            echo "mode=${{ github.event.inputs.mode || 'full' }}" >> $GITHUB_OUTPUT
+          fi
+
+      # ========================================
+      # Instagram Story を実行
+      # ========================================
+      - name: Generate and post Instagram story
+        working-directory: instagram-story-automation
+        env:
+          # ========== Google Spreadsheet ==========
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SHEET_GID: ${{ secrets.GOOGLE_SHEET_GID || '0' }}
+          
+          # ========== WordPress ==========
+          WORDPRESS_URL: ${{ secrets.WORDPRESS_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          
+          # ========== Instagram ==========
+          INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          
+          # ========== QR Code ==========
+          QR_CODE_URL: ${{ secrets.QR_CODE_URL }}
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          echo "Running in mode: $MODE"
+          
+          case "$MODE" in
+            full)
+              npm run full
+              ;;
+            test)
+              npm run test
+              ;;
+            generate-only)
+              npm run generate
+              ;;
+            post-only)
+              npm run post
+              ;;
+            *)
+              echo "Unknown mode: $MODE"
+              exit 1
+              ;;
+          esac
+
+      # ========================================
+      # ログを成果物として保存
+      # ========================================
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: execution-logs-${{ github.run_id }}
+          path: instagram-story-automation/logs-*.log
+          retention-days: 30
+
+      # ========================================
+      # 生成された画像を成果物として保存（テスト時）
+      # ========================================
+      - name: Upload generated image (test mode)
+        if: ${{ steps.mode.outputs.mode == 'test' || steps.mode.outputs.mode == 'generate-only' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: generated-story-image-${{ github.run_id }}
+          path: instagram-story-automation/output/
+          retention-days: 7
+
+      # ========================================
+      # 失敗通知（オプション：Slack など）
+      # ========================================
+      - name: Notify failure (optional)
+        if: failure()
+        run: |
+          echo "❌ Instagram Story posting failed!"
+          echo "Check logs in GitHub Actions or the uploaded logs artifact"

@@ -1,0 +1,41 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# Generated files
+output/
+.temp/
+dist/
+
+# Logs
+logs-*.log
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Artifacts
+*.png
+*.jpg
+*.jpeg
+
+# Instagram Story Automation
+instagram-story-automation/output/
+instagram-story-automation/.temp/
+instagram-story-automation/logs-*.log

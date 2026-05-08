@@ -1,0 +1,29 @@
+{
+  "name": "instagram-story-automation",
+  "version": "1.0.0",
+  "description": "Instagram Story auto-posting from daily availability data",
+  "main": "instagram-story-generator.js",
+  "type": "module",
+  "scripts": {
+    "test": "node instagram-story-generator.js --test",
+    "generate": "node instagram-story-generator.js --generate-only",
+    "post": "node instagram-story-generator.js --post-only",
+    "full": "node instagram-story-generator.js"
+  },
+  "keywords": [
+    "instagram",
+    "story",
+    "automation",
+    "scheduling"
+  ],
+  "author": "Travel Network Act",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "qrcode": "^1.5.3",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {}
+}
