@@ -110,7 +110,7 @@ jobs:
       # ========================================
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: execution-logs-${{ github.run_id }}
           path: instagram-story-automation/logs-*.log
@@ -121,7 +121,7 @@ jobs:
       # ========================================
       - name: Upload generated image (test mode)
         if: ${{ steps.mode.outputs.mode == 'test' || steps.mode.outputs.mode == 'generate-only' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: generated-story-image-${{ github.run_id }}
           path: instagram-story-automation/output/
