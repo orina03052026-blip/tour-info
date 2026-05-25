@@ -4,17 +4,19 @@ const TOURS = [
   {
     name: 'e-bike Ride around the Castle, Slurp Like a Local',
     url: 'https://www.travel-network-act.co.jp/local/en/castle-town/',
-    capacity: 4
+    capacity: 4,
+    weatherSensitive: true  // 雨天中止で非表示にする自転車ツアー
   },
   {
     name: 'e-bike Ride to the Sea, Slurp Like a Local',
     url: 'https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/',
-    capacity: 4
+    capacity: 4,
+    weatherSensitive: true  // 雨天中止で非表示にする自転車ツアー
   },
   {
     name: 'Himeji castle guide tour',
     url: 'https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/',
-    capacity: 8
+    capacity: 8  // 徒歩ガイド。雨天でも催行するので weatherSensitive は付けない
   }
 ];
 
@@ -171,9 +173,14 @@ function processRows(rows) {
 
     const slotKey = `${date}|${ts}`;
     if (!slots.has(slotKey)) {
-      slots.set(slotKey, { booked: [], unbookedCount: 0 });
+      slots.set(slotKey, { booked: [], unbookedCount: 0, ebikeClosed: false });
     }
     const slot = slots.get(slotKey);
+
+    // 雨天中止マーカー（Apps Script が Notes に付与）。e-bike ツアーだけ非表示にする。
+    if ((row.Notes || '').includes('EBIKE_CLOSED')) {
+      slot.ebikeClosed = true;
+    }
 
     if (booked > 0) {
       const tourDef = findTour(tour);
@@ -196,6 +203,7 @@ function buildCardsForSlot(slot) {
   for (const b of slot.booked) cards.push(b);
   if (slot.unbookedCount > 0) {
     for (const t of TOURS) {
+      if (slot.ebikeClosed && t.weatherSensitive) continue;  // 雨天中止枠は e-bike を出さない
       cards.push({ tour: t, remaining: t.capacity });
     }
   }
