@@ -126,6 +126,78 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// 各ツアーの手描き風イラスト（インラインSVG・外部画像なし）
+const BIKE_SVG = `
+    <g class="anim-bike" stroke="#3a4a5a" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <g class="anim-wheel"><circle cx="7" cy="17" r="7.5"/><path d="M7 11 L7 23 M1 17 L13 17 M2.6 12.6 L11.4 21.4 M2.6 21.4 L11.4 12.6" stroke-width="1.2"/></g>
+      <g class="anim-wheel"><circle cx="29" cy="17" r="7.5"/><path d="M29 11 L29 23 M23 17 L35 17 M24.6 12.6 L33.4 21.4 M24.6 21.4 L33.4 12.6" stroke-width="1.2"/></g>
+      <path d="M7 17 L18 17 L14 7 M18 17 L25 7 L29 17 M14 7 L26 7"/>
+      <path d="M26 7 L30 5"/>
+      <circle cx="18" cy="17" r="1.4" fill="#3a4a5a" stroke="none"/>
+    </g>`;
+
+const CASTLE_BIKE_SVG = `
+<svg viewBox="0 0 96 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g transform="translate(10,8)">
+    <polygon points="5,42 33,42 29,31 9,31" fill="#c9d4dc"/>
+    <rect x="10" y="20" width="18" height="11" fill="#ffffff"/>
+    <rect x="13" y="23" width="3.5" height="7" rx="1" fill="#bcd0db"/>
+    <rect x="21" y="23" width="3.5" height="7" rx="1" fill="#bcd0db"/>
+    <polygon points="3,21 19,10 35,21" fill="#356f95"/>
+    <rect x="2" y="19.5" width="34" height="2.6" rx="1.2" fill="#2b5c7d"/>
+    <rect x="15" y="11" width="8" height="9" fill="#ffffff"/>
+    <polygon points="9,12 19,3.5 29,12" fill="#356f95"/>
+    <rect x="8" y="10.6" width="22" height="2.2" rx="1" fill="#2b5c7d"/>
+    <circle cx="19" cy="3.6" r="1.6" fill="#f1b434"/>
+  </g>
+  <g transform="translate(54,26)">${BIKE_SVG}</g>
+</svg>`;
+
+const SEA_BIKE_SVG = `
+<svg viewBox="0 0 96 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle class="anim-sun" cx="80" cy="14" r="8" fill="#f6c453"/>
+  <g transform="translate(22,12)">${BIKE_SVG}</g>
+  <g class="anim-waves">
+    <path d="M-10 42 Q2 36 14 42 T38 42 T62 42 T86 42 T110 42 L110 60 L-10 60 Z" fill="#5ec5d6"/>
+    <path d="M-10 49 Q2 44 14 49 T38 49 T62 49 T86 49 T110 49 L110 60 L-10 60 Z" fill="#38a9bd"/>
+  </g>
+</svg>`;
+
+const CASTLE_GUIDE_SVG = `
+<svg viewBox="0 0 96 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g transform="translate(8,10)">
+    <polygon points="5,40 33,40 29,30 9,30" fill="#c9d4dc"/>
+    <rect x="10" y="20" width="18" height="10" fill="#ffffff"/>
+    <rect x="13" y="22.5" width="3.5" height="6.5" rx="1" fill="#bcd0db"/>
+    <rect x="21" y="22.5" width="3.5" height="6.5" rx="1" fill="#bcd0db"/>
+    <polygon points="3,21 19,11 35,21" fill="#356f95"/>
+    <rect x="2" y="19.5" width="34" height="2.5" rx="1.2" fill="#2b5c7d"/>
+    <rect x="15" y="12" width="8" height="8" fill="#ffffff"/>
+    <polygon points="9,13 19,5 29,13" fill="#356f95"/>
+    <rect x="8" y="11.6" width="22" height="2.2" rx="1" fill="#2b5c7d"/>
+    <circle cx="19" cy="5" r="1.5" fill="#f1b434"/>
+  </g>
+  <g transform="translate(60,14)">
+    <g class="anim-person">
+      <rect x="16.4" y="2" width="1.6" height="11" rx="0.6" fill="#8a6d3b"/>
+      <path class="anim-flag" d="M18 2.4 L25 4.6 L18 6.8 Z" fill="#e0524d"/>
+      <path d="M2 32 L2 18 Q2 12 8 12 Q14 12 14 18 L14 32 Z" fill="#e07a5f"/>
+      <rect x="3" y="31" width="5" height="9" rx="2" fill="#3a4a5a"/>
+      <rect x="9" y="31" width="5" height="9" rx="2" fill="#3a4a5a"/>
+      <path d="M11 17 L17 7" stroke="#e07a5f" stroke-width="3.4" stroke-linecap="round"/>
+      <circle cx="17" cy="6" r="1.8" fill="#f4c9a4"/>
+      <circle cx="8" cy="7" r="5" fill="#f4c9a4"/>
+      <path d="M3 7.5 Q8 1.5 13 7.5 Q13 3 8 2 Q3 3 3 7.5 Z" fill="#5a4632"/>
+    </g>
+  </g>
+</svg>`;
+
+const TOUR_VISUALS = {
+  'e-bike Ride around the Castle, Slurp Like a Local': { cls: 'illus-castle', svg: CASTLE_BIKE_SVG },
+  'e-bike Ride to the Sea, Slurp Like a Local': { cls: 'illus-sea', svg: SEA_BIKE_SVG },
+  'Himeji castle guide tour': { cls: 'illus-guide', svg: CASTLE_GUIDE_SVG }
+};
+
 function processRows(rows) {
   const seen = new Set();
   const slots = new Map();
@@ -213,11 +285,14 @@ function buildCardsForSlot(slot) {
 function renderTourCard({ tour, remaining }) {
   const status = statusInfo(remaining);
   const fullyClass = remaining <= 0 ? ' fully-booked' : '';
+  const v = TOUR_VISUALS[tour.name];
+  const illustration = v ? `<div class="tour-illustration ${v.cls}">${v.svg}</div>` : '';
   return `
     <div class="tour-card${fullyClass}">
       <div class="tour-name">${escapeHtml(tour.name)}</div>
       <span class="tour-status ${status.className}">${status.text}</span>
-      <a class="tour-button" href="${escapeHtml(tour.url)}" target="_blank" rel="noopener noreferrer">View Tour Details</a>
+      ${illustration}
+      <a class="tour-button" href="${escapeHtml(tour.url)}" target="_blank" rel="noopener noreferrer">Book Now!</a>
     </div>
   `;
 }

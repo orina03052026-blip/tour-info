@@ -105,6 +105,48 @@ body {
 
 .tour-card:last-child { margin-bottom: 0; }
 
+.tour-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 76px;
+  margin: 0 0 10px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tour-illustration svg {
+  height: 60px;
+  width: auto;
+  display: block;
+}
+
+.illus-castle { background: linear-gradient(135deg, #eaf3fa, #dcecf7); }
+.illus-sea    { background: linear-gradient(135deg, #e7f6f6, #d4f0ee); }
+.illus-guide  { background: linear-gradient(135deg, #f1eff8, #e7ecf6); }
+
+/* イラストのアニメーション */
+.anim-wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 1.8s linear infinite;
+}
+.anim-bike   { animation: bobY 1.8s ease-in-out infinite; }
+.anim-sun    { transform-box: fill-box; transform-origin: center; animation: pulse 2.6s ease-in-out infinite; }
+.anim-waves  { animation: sway 3.4s ease-in-out infinite; }
+.anim-person { animation: bobY 2.2s ease-in-out infinite; }
+.anim-flag   { transform-box: fill-box; transform-origin: 0% 50%; animation: flagWave 1.3s ease-in-out infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes bobY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes sway { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.12); opacity: 0.82; } }
+@keyframes flagWave { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-10deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-wheel, .anim-bike, .anim-sun, .anim-waves, .anim-person, .anim-flag { animation: none; }
+}
+
 .tour-card.fully-booked {
   opacity: 0.55;
   background: #f3f3f3;
@@ -135,19 +177,44 @@ body {
   display: block;
   text-align: center;
   text-decoration: none;
-  padding: 10px;
-  border-radius: 10px;
-  background: #009efd;
+  padding: 13px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #6cccff 0%, #1c9bf5 48%, #0072d6 100%);
   color: #fff;
   font-weight: bold;
-  font-size: 0.85rem;
-  transition: opacity 0.2s;
+  font-size: 0.92rem;
+  letter-spacing: 0.3px;
+  border: none;
+  text-shadow: 0 1px 1px rgba(0, 50, 100, 0.45);
+  box-shadow:
+    0 7px 0 #005bad,
+    0 9px 3px rgba(0, 0, 0, 0.2),
+    0 12px 20px rgba(0, 120, 210, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -4px 7px rgba(0, 60, 120, 0.4);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
 }
 
-.tour-button:hover { opacity: 0.85; }
+.tour-button:hover { filter: brightness(1.06); }
+
+.tour-button:active {
+  transform: translateY(6px);
+  box-shadow:
+    0 1px 0 #005bad,
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 5px rgba(0, 60, 120, 0.4);
+}
 
 .tour-card.fully-booked .tour-button {
-  background: #888;
+  background: linear-gradient(180deg, #b3bbc2 0%, #8e969d 55%, #79818a 100%);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 7px 0 #5c646c,
+    0 9px 3px rgba(0, 0, 0, 0.18),
+    0 12px 18px rgba(0, 0, 0, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.18);
 }
 
 .empty-message {
@@ -177,4 +244,6 @@ body {
   .timeslot { padding: 12px; }
   .tour-card { padding: 10px; }
   .tour-name { font-size: 0.9rem; }
+  .tour-illustration { height: 64px; margin: 0 0 8px; }
+  .tour-illustration svg { height: 50px; }
 }
