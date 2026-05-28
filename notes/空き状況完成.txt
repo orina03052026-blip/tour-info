@@ -1,0 +1,95 @@
+============================================================
+作業進捗メモ — Availability シート / カレンダー同期 / HP 連携
+最終更新: 2026-05-09
+============================================================
+
+# 全体構成（再確認）
+
+[Google Calendar] -- (sync_availability.gs / syncAvailability) -->
+[Google Spreadsheet "今日の空き状況" の Availability シート] -- (CSV 直読み) -->
+[GitHub Pages: tour-info/index.html] -- (iframe) -->
+[WordPress 公開ページ]
+
+- スプレッドシート ID: 1Lyl_tjTHza8Wfp2WiDepi_ZTY_Xo6Xqpuhgog-lufFY
+- 共有 Calendar: comecomehimeji@gmail.com
+- HP: https://www.travel-network-act.co.jp/local/en/we-still-have-spots-available-for-our-tours-and-etc/
+- ローカル開発版 HTML: ./index.html（本番反映は tour-info リポジトリ側）
+
+# 2026-05-09 に判明した本当の原因
+
+5/8 のメモでは「fill_missing_dates が未実行だから 213 日欠落」と書いていたが、
+実際は **fill_missing_dates を実行しても 5 分以内に元に戻る**状態だった。
+（5/9 10:21 に added=1244 で成功 → 5/9 11:24 時点で 57 日に戻っていた）
+
+真因はデプロイ中の `syncAvailability`（5 分おきの時間トリガーで動いている）の作りで、
+
+- targetDates を「今日 + 明日 + カレンダーに予定がある日 + Manual Lock 行」だけで構成
+- replaceSheetRows_ で **シート全消去** → targetDates の日だけ書き戻し
+- → カレンダーに予定が無く Manual Lock も無い日付の行は毎回消える
+
+なので fill_missing_dates が 311 日分の行を追加 → syncAvailability が次の実行で全部消す、
+というイタチごっこになっていた。`fill_missing_dates` 自体には問題なかった。
+
+# 2026-05-09 にやったこと（このセッション）
+
+1. デプロイ中の `syncAvailability` の中身を `apps_script/sync_availability.gs` に保存
+2. 同ファイル内の `syncAvailability` 関数の targetDates 組み立て部分を、
+   「今日 〜 今日 + syncDays(365) を必ず全部入れる」に変更（差分はそこだけ）
+3. これにより、syncAvailability 単独で全日付が必ず埋まる作りになった
+4. fill_missing_dates 系は不要（廃止）。
+
+# このあとユーザー側でやってほしい操作
+
+A. スクリプト差し替え（必須）
+   1. スプレッドシート（ID 1Lyl_...）を開く
+   2. Extensions → Apps Script
+   3. 既存の syncAvailability が書いてあるファイルの中身をすべて削除
+   4. リポジトリ側 `apps_script/sync_availability.gs` を全文コピペ → Save
+
+B. 動作確認（必須）
+   5. 関数 `syncAvailability` を選んで Run → 権限承認
+   6. 実行ログにエラーが無いことを確認（既知エラー「Tour could not be detected:
+      レンタサイクル2台」はカレンダー側の予定タイトルの問題。Bokun でない
+      普通の予定がパース対象になっているだけで、行構築は止まらない）
+   7. シート末尾までスクロール → 2027-05 ぐらいまで日付が連続していることを確認
+   8. 5/19 / 5/22 / 5/25 / 5/26 / 5/28 / 5/29 がちゃんと存在することを確認
+
+C. 既設の自動化はそのまま
+   - 5 分おきの syncAvailability 時間トリガーは触らない（修正版でも同じ挙動を期待する）
+   - fill_missing_dates / fillMissingDatesDaily のトリガーは削除して良い
+
+D. （任意）旧 fill_missing_dates の片付け
+   - Apps Script から fill_missing_dates 関連のファイルを削除して良い
+   - リポジトリ側のローカル `apps_script/fill_missing_dates.gs` /
+     `apps_script/fill_dates_guide_ja.md` は廃止扱い（参考用に残してある）
+
+# 動作確認チェックリスト
+
+- [ ] スプレッドシートで 2026-05-09〜2027-05 ぐらいまで日付が 1 日 4 行ずつ連続
+- [ ] 5/19, 5/22, 5/25, 5/26, 5/28, 5/29 のどれも 4 行ある
+- [ ] Manual Lock=TRUE の行が改変されていない
+- [ ] HP（WordPress 埋め込み）で Today / Tomorrow / Day After が出る
+- [ ] HP に「No schedule for the next 3 days」が誤って出ていない
+- [ ] 5 分後に再度 CSV を確認して、行が消えていない（元に戻らない）
+
+# 既知の注意点 / 罠
+
+- syncAvailability は **シートを毎回全消去 → 再構築する設計**。
+  したがって「targetDates に含まれない日付の行は必ず消える」のは仕様。
+  欠落を直すなら fill ではなく targetDates 側を直すのが正解。
+- スプレッドシートの「共有」が崩れると HP 側でデータが出なくなる
+  → 「リンクを知っている全員（閲覧者）」必須
+- /export?format=csv&gid=0 を使用（「ウェブに公開」CSVは Google が最大 5 分
+  キャッシュするので使わない）
+- ヘッダー名（Date / Staff / Time Slot / Status / Tour / Booked / Capacity /
+  Notes / Source / Manual Lock）が変わると stop する仕様
+
+# 関連ファイル
+
+- apps_script/sync_availability.gs        … 本番デプロイ中のスクリプト（このセッションで修正）
+- apps_script/calendar_sync_complete.gs   … 旧版（syncCalendarToSheet）。現在は使っていない
+- apps_script/calendar_sync_setup_guide_ja.md … 旧ガイド（参考）
+- apps_script/fill_missing_dates.gs       … 廃止（参考用に残置）
+- apps_script/fill_dates_guide_ja.md      … 廃止（参考用に残置）
+- index.html                              … ローカル開発版 HP
+- README.txt                              … Claude 引き継ぎ用の入口

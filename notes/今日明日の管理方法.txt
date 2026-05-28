@@ -1,0 +1,51 @@
+HPの管理方法
+
+GitHub Pagesで動いている 
+WordPressにiframeで埋め込んでいるだけ 
+ 
+Excel / スプレッドシートの場所　https://docs.google.com/spreadsheets/d/1Lyl_tjTHza8Wfp2WiDepi_ZTY_Xo6Xqpuhgog-lufFY/edit?gid=0#gid=0　 
+
+Googleスプレッドシートです 
+HPがどのシートhttps://www.travel-network-act.co.jp/local/wp-admin/post.php?post=3944&action=edit 
+公開用CSVやAPIなど、今の連携方法？？ 
+3コースの正式名称
+
+e-bike Ride around the Castle, Slurp Like a Local
+e-bike Ride to the Sea, Slurp Like a Local
+Himeji castle guide tour
+ 
+各コースの詳細ページURL
+
+1コース目のリンク先https://www.travel-network-act.co.jp/local/en/castle-town/
+2コース目のリンク先https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/
+姫路城ガイドツアーのリンク先https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/
+Excelの入力ルール
+
+「休み」と入力する列
+ツアー名を選ぶ列
+予約人数を入れる列
+AM / PMそれぞれ何列使うか
+予約が入った時の更新方法
+
+手動でExcelに人数を入れる 
+予約システムから自動反映されるのか（将来的にはそうしたい） 
+予約がキャンセルされた時も手動で戻す。 
+HPでの表示ルール　すべて英語で表記　 
+
+残席を数字で出す 
+「受付可」「残り2名」「満席」などの文言　 
+未予約枠は3コース全部を表示する 
+予約済み枠はそのツアーだけ表示する 
+スタッフが増えた場合
+
+今後Kana / Sho以外も増える可能性がある。 
+増えるなら、スタッフ名を増やすだけで枠が増える作りにする。 
+今日・明日の判定
+
+日本時間の今日・明日。 
+ 
+当日の９時３０以降はAMを消す。 
+デザイン
+
+今のカード風デザインを残す。 
+スマホでもおなじようにみせる。
