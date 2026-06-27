@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Your Experience · Himeji</title>
+  <link rel="stylesheet" href="booking.css">
+</head>
+<body>
+  <div class="booking-wrap">
+    <header class="page-header">
+      <div class="page-title">Book Your Experience</div>
+      <div class="page-subtitle">Algueblue Thalassotherapy Spa · e-bike Tours · Himeji Castle Guide</div>
+    </header>
+
+    <div id="form-body" class="card">
+      <section class="block">
+        <h3 class="step-title">What would you like to book?</h3>
+        <div id="activities" class="choices"></div>
+      </section>
+
+      <section id="date-section" class="block" hidden>
+        <h3 class="step-title">Choose a date</h3>
+        <div id="dates" class="choices"></div>
+      </section>
+
+      <section id="details-section" class="block" hidden></section>
+
+      <section id="summary-section" class="block summary" hidden>
+        <h3 class="step-title">Summary</h3>
+        <div id="summary"></div>
+        <button id="submit-btn" type="button" class="submit" disabled>Confirm booking</button>
+        <div id="status" class="status"></div>
+        <p class="muted small">No payment is taken now — you pay on site.</p>
+      </section>
+    </div>
+
+    <div id="done" class="card done" hidden></div>
+  </div>
+
+  <script src="booking.js"></script>
+</body>
+</html>

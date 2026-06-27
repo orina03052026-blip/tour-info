@@ -394,16 +394,13 @@ function setupTrigger() {
     }
   });
 
-  // 毎日 6時 / 7時 / 8時 / 9時 / 18時 / 0時(24時) に実行（各時間帯の中で起動。分単位指定は不可）
-  const hours = [6, 7, 8, 9, 18, 0];
-  hours.forEach(function(hour) {
-    ScriptApp.newTrigger('syncAvailability')
-      .timeBased()
-      .atHour(hour)
-      .everyDays(1)
-      .inTimezone(CONFIG.timeZone)
-      .create();
-  });
+  // 60分間隔（毎時）で実行。Algueblue 同期も syncAvailability に統合済みなので
+  // この1本で Availability シート（ツアー＋Algueblueのスタッフ空き）が更新される。
+  // ※ 5分間隔は Gmail の「トリガー合計実行時間90分/日」上限に当たるため不可。60分に決定（2026-06-27）。
+  ScriptApp.newTrigger('syncAvailability')
+    .timeBased()
+    .everyHours(1)
+    .create();
 }
 
 function parseBookingEvent(event) {

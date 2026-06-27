@@ -1,24 +1,38 @@
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Lyl_tjTHza8Wfp2WiDepi_ZTY_Xo6Xqpuhgog-lufFY/export?format=csv&gid=0';
 
+// Algueblue（Thalassotherapy Spa）の空き状況は予約用 Web App の doGet から取得する。
+// booking.js と同じ /exec URL を貼ること（未設定なら Algueblue カードは出ない）。
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0-dTBFpVt0MyulUePlrv4hzqTqSbLbKVI_n0fzlGGb48ZM4S-YkaDnI8uI8Iiw3w3/exec';
+const ALGUEBLUE_NAME = 'Thalassotherapy Spa';
+
 const TOURS = [
   {
     name: 'e-bike Ride around the Castle, Slurp Like a Local',
+    code: 'ebike-castle',  // 予約フォーム(booking.html)の activity コード
     url: 'https://www.travel-network-act.co.jp/local/en/castle-town/',
     capacity: 4,
     weatherSensitive: true  // 雨天中止で非表示にする自転車ツアー
   },
   {
     name: 'e-bike Ride to the Sea, Slurp Like a Local',
+    code: 'ebike-sea',
     url: 'https://www.travel-network-act.co.jp/local/en/tour-from-the-shikama-kaido-to-the-sea/',
     capacity: 4,
     weatherSensitive: true  // 雨天中止で非表示にする自転車ツアー
   },
   {
     name: 'Himeji castle guide tour',
+    code: 'castle-guide',
     url: 'https://www.travel-network-act.co.jp/local/en/himeji-castle-guide-personal-tour/',
     capacity: 8  // 徒歩ガイド。雨天でも催行するので weatherSensitive は付けない
   }
 ];
+
+// 予約はすべて統一フォーム booking.html へ（activity を事前選択）
+const BOOKING_FORM_URL = 'booking.html';
+function bookingUrlFor(code) {
+  return code ? `${BOOKING_FORM_URL}?activity=${encodeURIComponent(code)}` : BOOKING_FORM_URL;
+}
 
 const REQUIRED_HEADERS = ['Date', 'Staff', 'Time Slot', 'Status', 'Tour', 'Booked', 'Capacity', 'Notes'];
 const TIME_SLOTS = ['AM', 'PM'];
@@ -198,6 +212,61 @@ const TOUR_VISUALS = {
   'Himeji castle guide tour': { cls: 'illus-guide', svg: CASTLE_GUIDE_SVG }
 };
 
+// Algueblue スパ用のイラスト（海藻＝algue を思わせる葉＋雫）
+const ALGUEBLUE_SVG = `
+<svg viewBox="0 0 96 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g transform="translate(30,6)" fill="none" stroke="#2b8a7d" stroke-width="2.4" stroke-linecap="round">
+    <path class="anim-leaf" d="M18 46 C18 30 10 22 4 14 C14 16 20 24 18 38"/>
+    <path class="anim-leaf" d="M18 46 C18 28 26 20 33 12 C24 16 18 24 18 38"/>
+    <path d="M18 46 L18 30"/>
+  </g>
+  <circle class="anim-drop" cx="64" cy="20" r="4.5" fill="#5ec5d6"/>
+  <circle class="anim-drop" cx="74" cy="32" r="3" fill="#38a9bd"/>
+</svg>`;
+
+// Algueblue は1日1枚・AM/PM 縛りなし。受付可(Available)／満席(Fully booked)の2状態。
+function renderAlgueblueCard(open) {
+  const status = open
+    ? { text: 'Available', className: 'status-available' }
+    : { text: 'Fully booked', className: 'status-fully' };
+  const fullyClass = open ? '' : ' fully-booked';
+  return `
+    <div class="tour-card${fullyClass}">
+      <div class="tour-name">${escapeHtml(ALGUEBLUE_NAME)}</div>
+      <span class="tour-status ${status.className}">${status.text}</span>
+      <div class="tour-illustration illus-spa">${ALGUEBLUE_SVG}</div>
+      <a class="tour-button" href="${escapeHtml(bookingUrlFor('algueblue'))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
+    </div>
+  `;
+}
+
+// その日の Algueblue ブロック（AM/PM とは別枠で1枚）。availability 未取得 or 休業日は出さない。
+function renderAlgueblueBlock(dateStr, algueblue) {
+  if (!algueblue || !algueblue[dateStr]) return '';
+  const ab = algueblue[dateStr].algueblue;
+  if (!ab || ab.closed) return '';
+  return `
+    <div class="timeslot timeslot-spa">
+      <div class="timeslot-label">Thalassotherapy Spa</div>
+      ${renderAlgueblueCard(!!ab.anyOpen)}
+    </div>
+  `;
+}
+
+// 予約用 Web App から今日・明日の Algueblue 空きを取得（失敗してもツアー表示は壊さない）
+async function fetchAlgueblue() {
+  if (!WEBAPP_URL || WEBAPP_URL.indexOf('PASTE_') === 0) return null;
+  try {
+    const res = await fetch(`${WEBAPP_URL}?action=availability&t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data && data.ok ? data.days : null;
+  } catch (err) {
+    console.warn('Algueblue availability unavailable:', err);
+    return null;
+  }
+}
+
 function processRows(rows) {
   const seen = new Set();
   const slots = new Map();
@@ -292,7 +361,7 @@ function renderTourCard({ tour, remaining }) {
       <div class="tour-name">${escapeHtml(tour.name)}</div>
       <span class="tour-status ${status.className}">${status.text}</span>
       ${illustration}
-      <a class="tour-button" href="${escapeHtml(tour.url)}" target="_blank" rel="noopener noreferrer">Book Now!</a>
+      <a class="tour-button" href="${escapeHtml(bookingUrlFor(tour.code))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
     </div>
   `;
 }
@@ -314,7 +383,7 @@ function renderTimeSlot(label, cards) {
   `;
 }
 
-function render(slots) {
+function render(slots, algueblue) {
   const jst = getJstParts();
   const today = jst.date;
   const tomorrow = addDays(today, 1);
@@ -334,6 +403,7 @@ function render(slots) {
     let body = '';
     if (amCards !== null) body += renderTimeSlot('Morning (AM)', amCards);
     body += renderTimeSlot('Afternoon (PM)', pmCards);
+    body += renderAlgueblueBlock(d.date, algueblue);
 
     return `
       <div class="day-card">
@@ -370,7 +440,8 @@ async function loadData() {
 
     const { rows } = csvToObjects(rawRows);
     const slots = processRows(rows);
-    render(slots);
+    const algueblue = await fetchAlgueblue();
+    render(slots, algueblue);
   } catch (err) {
     console.error('Failed to load tour data:', err);
     showError();

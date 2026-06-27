@@ -124,6 +124,11 @@ body {
 .illus-castle { background: linear-gradient(135deg, #eaf3fa, #dcecf7); }
 .illus-sea    { background: linear-gradient(135deg, #e7f6f6, #d4f0ee); }
 .illus-guide  { background: linear-gradient(135deg, #f1eff8, #e7ecf6); }
+.illus-spa    { background: linear-gradient(135deg, #e6f7f1, #d3f0e6); }
+
+/* Algueblue（スパ）は AM/PM とは別枠。うっすら色を変えて差別化 */
+.timeslot-spa { background: linear-gradient(180deg, #f6fcfa, #ffffff); }
+.timeslot-spa .timeslot-label::before { content: '\1F33F\00A0'; }
 
 /* イラストのアニメーション */
 .anim-wheel {
