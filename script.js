@@ -2,7 +2,7 @@ const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Lyl_tjTHza8Wfp2Wi
 
 // Algueblue（Thalassotherapy Spa）の空き状況は予約用 Web App の doGet から取得する。
 // booking.js と同じ /exec URL を貼ること（未設定なら Algueblue カードは出ない）。
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0-dTBFpVt0MyulUePlrv4hzqTqSbLbKVI_n0fzlGGb48ZM4S-YkaDnI8uI8Iiw3w3/exec';
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyL_cqU6-SkSg7yNXCSterbVFVM4lPp8d6W4mJQyvXKSh7Qqu2Njsr_pPz11v8rvJw/exec';
 const ALGUEBLUE_NAME = 'Thalassotherapy Spa';
 
 const TOURS = [

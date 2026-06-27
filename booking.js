@@ -1,7 +1,7 @@
 /* Unified booking form (Algueblue + cycling + Himeji castle).
  * Talks to the Apps Script Web App: GET ?action=availability / POST (text/plain JSON).
  * Deploy the Web App, then paste its /exec URL below. */
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0-dTBFpVt0MyulUePlrv4hzqTqSbLbKVI_n0fzlGGb48ZM4S-YkaDnI8uI8Iiw3w3/exec';
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyL_cqU6-SkSg7yNXCSterbVFVM4lPp8d6W4mJQyvXKSh7Qqu2Njsr_pPz11v8rvJw/exec';
 
 const ACTIVITIES = [
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue' },
