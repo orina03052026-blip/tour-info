@@ -28,10 +28,13 @@ const TOURS = [
   }
 ];
 
-// 予約はすべて統一フォーム booking.html へ（activity を事前選択）
+// 予約はすべて統一フォーム booking.html へ（activity と date を事前選択して二度手間を防ぐ）
 const BOOKING_FORM_URL = 'booking.html';
-function bookingUrlFor(code) {
-  return code ? `${BOOKING_FORM_URL}?activity=${encodeURIComponent(code)}` : BOOKING_FORM_URL;
+function bookingUrlFor(code, date) {
+  const params = [];
+  if (code) params.push('activity=' + encodeURIComponent(code));
+  if (date) params.push('date=' + encodeURIComponent(date));
+  return params.length ? `${BOOKING_FORM_URL}?${params.join('&')}` : BOOKING_FORM_URL;
 }
 
 const REQUIRED_HEADERS = ['Date', 'Staff', 'Time Slot', 'Status', 'Tour', 'Booked', 'Capacity', 'Notes'];
@@ -225,7 +228,7 @@ const ALGUEBLUE_SVG = `
 </svg>`;
 
 // Algueblue は1日1枚・AM/PM 縛りなし。受付可(Available)／満席(Fully booked)の2状態。
-function renderAlgueblueCard(open) {
+function renderAlgueblueCard(open, date) {
   const status = open
     ? { text: 'Available', className: 'status-available' }
     : { text: 'Fully booked', className: 'status-fully' };
@@ -235,7 +238,7 @@ function renderAlgueblueCard(open) {
       <div class="tour-name">${escapeHtml(ALGUEBLUE_NAME)}</div>
       <span class="tour-status ${status.className}">${status.text}</span>
       <div class="tour-illustration illus-spa">${ALGUEBLUE_SVG}</div>
-      <a class="tour-button" href="${escapeHtml(bookingUrlFor('algueblue'))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
+      <a class="tour-button" href="${escapeHtml(bookingUrlFor('algueblue', date))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
     </div>
   `;
 }
@@ -248,7 +251,7 @@ function renderAlgueblueBlock(dateStr, algueblue) {
   return `
     <div class="timeslot timeslot-spa">
       <div class="timeslot-label">Thalassotherapy Spa</div>
-      ${renderAlgueblueCard(!!ab.anyOpen)}
+      ${renderAlgueblueCard(!!ab.anyOpen, dateStr)}
     </div>
   `;
 }
@@ -351,7 +354,7 @@ function buildCardsForSlot(slot) {
   return cards;
 }
 
-function renderTourCard({ tour, remaining }) {
+function renderTourCard({ tour, remaining }, date) {
   const status = statusInfo(remaining);
   const fullyClass = remaining <= 0 ? ' fully-booked' : '';
   const v = TOUR_VISUALS[tour.name];
@@ -361,12 +364,12 @@ function renderTourCard({ tour, remaining }) {
       <div class="tour-name">${escapeHtml(tour.name)}</div>
       <span class="tour-status ${status.className}">${status.text}</span>
       ${illustration}
-      <a class="tour-button" href="${escapeHtml(bookingUrlFor(tour.code))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
+      <a class="tour-button" href="${escapeHtml(bookingUrlFor(tour.code, date))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
     </div>
   `;
 }
 
-function renderTimeSlot(label, cards) {
+function renderTimeSlot(label, cards, date) {
   if (cards.length === 0) {
     return `
       <div class="timeslot">
@@ -378,7 +381,7 @@ function renderTimeSlot(label, cards) {
   return `
     <div class="timeslot">
       <div class="timeslot-label">${label}</div>
-      ${cards.map(renderTourCard).join('')}
+      ${cards.map(c => renderTourCard(c, date)).join('')}
     </div>
   `;
 }
@@ -401,8 +404,8 @@ function render(slots, algueblue) {
     const pmCards = buildCardsForSlot(pmSlot);
 
     let body = '';
-    if (amCards !== null) body += renderTimeSlot('Morning (AM)', amCards);
-    body += renderTimeSlot('Afternoon (PM)', pmCards);
+    if (amCards !== null) body += renderTimeSlot('Morning (AM)', amCards, d.date);
+    body += renderTimeSlot('Afternoon (PM)', pmCards, d.date);
     body += renderAlgueblueBlock(d.date, algueblue);
 
     return `

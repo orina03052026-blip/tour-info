@@ -32,9 +32,11 @@ function fmtDateLabel(dateStr, idx) {
 }
 
 async function init() {
-  // 今日・明日ページのカードから activity を引き継いで事前選択
-  const preset = new URLSearchParams(location.search).get('activity');
+  // 今日・明日ページのカードから activity / date を引き継いで事前選択（日付の選び直しを省く）
+  const qs = new URLSearchParams(location.search);
+  const preset = qs.get('activity');
   if (preset && ACTIVITIES.some((a) => a.code === preset)) state.activity = preset;
+  state.presetDate = qs.get('date') || null;
   renderActivities();
   try {
     const res = await fetch(WEBAPP_URL + '?action=availability', { cache: 'no-store' });
@@ -42,7 +44,12 @@ async function init() {
     if (!data.ok) throw new Error(data.error || 'load failed');
     state.availability = data.days;
     state.dates = Object.keys(data.days).sort();
-    if (state.activity) { renderDates(); renderSummary(); } // 事前選択を反映
+    // 事前選択を反映。date も渡されていて受付可なら選択し、開始時刻の選択へ直行
+    if (state.activity && state.presetDate && state.dates.indexOf(state.presetDate) !== -1) {
+      state.date = state.presetDate;
+      if (!isDateOpen(state.date)) state.date = null; // 満席/休業なら日付選択に戻す
+    }
+    if (state.activity) { renderDates(); renderDetails(); renderSummary(); }
   } catch (err) {
     $('#status').textContent = 'Could not load availability. Please try again later.';
     console.error(err);
