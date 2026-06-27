@@ -77,6 +77,7 @@ const CONFIG = {
     'Notes',
     'Source',
     'Manual Lock',
+    'Working Hours', // 人が読む用: Kana=○予定の実時刻 / Sho=9:30–18:00から✖を除いた範囲 / 休み
   ],
   allowedValues: {
     'Time Slot': ['AM', 'PM'],
@@ -485,6 +486,8 @@ function buildBaseAvailability_(dates, staffEventsByDate) {
   const map = {};
   dates.sort().forEach(function(dateKey) {
     CONFIG.staffPriority.forEach(function(staffName) {
+      // 実勤務時間（読みやすい表示）は日付×スタッフで1回だけ算出し、AM/PM両方に入れる
+      const workingHours = staffWorkingHoursText_(staffName, dateKey, staffEventsByDate);
       ['AM', 'PM'].forEach(function(slot) {
         const status = calculateStaffSlotStatus_(staffName, dateKey, slot, staffEventsByDate);
         map[makeKey_(dateKey, staffName, slot)] = {
@@ -498,11 +501,64 @@ function buildBaseAvailability_(dates, staffEventsByDate) {
           Notes: '',
           Source: 'Calendar',
           'Manual Lock': 'FALSE',
+          'Working Hours': workingHours,
         };
       });
     });
   });
   return map;
+}
+
+/**
+ * 人が読む用の「実勤務時間」テキストを返す。AM/PM判定とは別に、カレンダーの実時刻を出す。
+ *   - Kana（availability）: ○付きの時間予定の実時刻レンジ（例 9:30–15:00）。○予定が無ければ「休み」。
+ *   - Sho（offOnly）: 既定 9:30–18:00 から ✖（時間付き）を除いた表記。終日✖なら「休み」。
+ * 失敗しても同期を止めないよう try/catch で空文字を返す。
+ */
+function staffWorkingHoursText_(staffName, dateKey, staffEventsByDate) {
+  try {
+    const cfg = CONFIG.staff[staffName];
+    const evs = (staffEventsByDate[dateKey] || []).filter(function(e) {
+      return eventMatchesStaff_(e, staffName);
+    });
+    const fmt = function(d) { return Utilities.formatDate(d, CONFIG.timeZone, 'H:mm'); };
+
+    // 終日OFF（終日✖ / 時間情報の無い✖）→ 休み
+    const allDayOff = evs.some(function(e) {
+      return isOffEvent_(e) && e.isAllDayEvent();
+    });
+
+    if (cfg.calendarMode === 'availability') {
+      if (allDayOff) return '休み';
+      const avail = evs.filter(function(e) {
+        return isAvailableEvent_(e) && !e.isAllDayEvent() && e.getStartTime() && e.getEndTime();
+      });
+      if (!avail.length) return '休み';
+      let minS = null, maxE = null;
+      avail.forEach(function(e) {
+        const s = e.getStartTime(), en = e.getEndTime();
+        if (minS === null || s.getTime() < minS.getTime()) minS = s;
+        if (maxE === null || en.getTime() > maxE.getTime()) maxE = en;
+      });
+      return fmt(minS) + '–' + fmt(maxE);
+    }
+
+    if (cfg.calendarMode === 'offOnly') {
+      if (allDayOff) return '休み';
+      const offs = evs.filter(function(e) { return isOffEvent_(e) && !e.isAllDayEvent(); })
+        .map(function(e) {
+          const r = parseTimeRange_(eventText_(e));
+          if (r) return r.start + '–' + r.end;
+          const s = e.getStartTime(), en = e.getEndTime();
+          return (s && en) ? (fmt(s) + '–' + fmt(en)) : null;
+        })
+        .filter(Boolean);
+      return offs.length ? ('9:30–18:00（休 ' + offs.join(', ') + '）') : '9:30–18:00';
+    }
+    return '';
+  } catch (err) {
+    return '';
+  }
 }
 
 /**
