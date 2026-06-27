@@ -15,8 +15,8 @@ const state = {
   dates: [],            // ordered date strings (today, tomorrow)
   activity: null,
   date: null,
-  plan: null, option: null, start: null,  // Algueblue
-  slot: null,                              // tours
+  plan: null, option: null, start: null,  // Algueblue: plan/option/start; tours: start
+  height: '',                              // e-bike tours: rider height(s)
   people: 1,
 };
 
@@ -63,7 +63,7 @@ function renderActivities() {
   ACTIVITIES.forEach((a) => {
     const b = el('button', 'choice' + (state.activity === a.code ? ' selected' : ''), esc(a.label));
     b.type = 'button';
-    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, slot: null }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, height: '' }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
 }
@@ -82,7 +82,7 @@ function renderDates() {
     const b = el('button', 'choice' + (state.date === d ? ' selected' : '') + (open ? '' : ' disabled'), fmtDateLabel(d, idx));
     b.type = 'button';
     b.disabled = !open;
-    b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null, slot: null }); renderDates(); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null }); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
 }
@@ -104,7 +104,28 @@ function renderDetails() {
   if (activityKind() === 'algueblue') renderAlgueblueDetails(sec);
   else renderTourDetails(sec);
   renderPeople(sec);
+  if (activityRequiresHeight()) renderHeight(sec);
   renderContact(sec);
+}
+
+// e-bike ツアーは自転車サイズ確認のため身長が必要（doGet の requiresHeight で判定）
+function activityRequiresHeight() {
+  if (activityKind() !== 'tour' || !state.date) return false;
+  const t = state.availability[state.date].tours[state.activity];
+  return !!(t && t.requiresHeight);
+}
+
+function renderHeight(sec) {
+  sec.appendChild(el('h3', 'step-title', 'Rider height — for bike sizing'));
+  const f = el('label', 'field');
+  f.appendChild(el('span', 'field-label', 'Height in cm (one per rider, e.g. 165, 172) *'));
+  const input = el('input');
+  input.type = 'text';
+  input.placeholder = 'e.g. 165, 172';
+  input.value = state.height || '';
+  input.oninput = () => { state.height = input.value; renderSummary(); };
+  f.appendChild(input);
+  sec.appendChild(f);
 }
 
 function renderAlgueblueDetails(sec) {
@@ -205,6 +226,7 @@ function renderSummary() {
   }
   if (state.start) lines.push(['Start', state.start]);
   lines.push(['People', state.people]);
+  if (activityRequiresHeight() && state.height) lines.push(['Height (cm)', state.height]);
   $('#summary').innerHTML = lines.map(([k, v]) => '<div class="sum-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('');
   $('#submit-btn').disabled = !ready;
 }
@@ -218,7 +240,9 @@ function isReady() {
     if (plan.options && plan.options.length && !state.option) return false;
     return true;
   }
-  return !!state.start;
+  if (!state.start) return false;
+  if (activityRequiresHeight() && !String(state.height || '').trim()) return false;
+  return true;
 }
 
 async function submit() {
@@ -227,7 +251,7 @@ async function submit() {
   const body = {
     activity: state.activity, date: state.date, people: state.people,
     name: state.name, email: state.email, phone: state.phone || '', note: state.note || '',
-    plan: state.plan, option: state.option, start: state.start, slot: state.slot,
+    plan: state.plan, option: state.option, start: state.start, height: state.height || '',
   };
   try {
     const res = await fetch(WEBAPP_URL, {

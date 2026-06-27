@@ -50,9 +50,15 @@ const BOOKING_CONFIG = {
   // サイクリング / 城ガイド。スタッフ(Kana/Sho)の空きに収まる開始時刻を30分刻みで提示。
   // name は Availability シート/CSV の Tour 値・script.js の表示名と対応づける。
   tours: {
-    'ebike-castle': { code: 'ebike-castle', name: 'e-bike Ride around the Castle, Slurp Like a Local', sheetTour: 'e-bike Ride around the Castle', capacity: 4, weatherSensitive: true },
-    'ebike-sea':    { code: 'ebike-sea',    name: 'e-bike Ride to the Sea, Slurp Like a Local',        sheetTour: 'e-bike Ride to the Sea',        capacity: 4, weatherSensitive: true },
-    'castle-guide': { code: 'castle-guide', name: 'Himeji castle guide tour',                           sheetTour: 'Himeji castle guide tour',      capacity: 8, weatherSensitive: false },
+    'ebike-castle': { code: 'ebike-castle', name: 'e-bike Ride around the Castle, Slurp Like a Local', sheetTour: 'e-bike Ride around the Castle', capacity: 4, weatherSensitive: true,  requiresHeight: true },
+    'ebike-sea':    { code: 'ebike-sea',    name: 'e-bike Ride to the Sea, Slurp Like a Local',        sheetTour: 'e-bike Ride to the Sea',        capacity: 4, weatherSensitive: true,  requiresHeight: true },
+    'castle-guide': { code: 'castle-guide', name: 'Himeji castle guide tour',                           sheetTour: 'Himeji castle guide tour',      capacity: 8, weatherSensitive: false, requiresHeight: false },
+  },
+
+  // 確認メール（自動返信）
+  email: {
+    businessEmail: 'comecomehimeji@gmail.com',
+    fromName: 'Travel Network ACT · Himeji',
   },
 
   // ツアー予約の時間モデル（2026-06-27 決定）: 全ツアー所要3時間、9:30〜15:00 の30分刻みで開始、
@@ -151,7 +157,7 @@ function computeToursAvailability_(dateStr, isToday) {
       }
     });
     const starts = Object.keys(startSet).map(Number).sort(function (a, b) { return a - b; }).map(fromMin_);
-    out[code] = { name: t.name, capacity: t.capacity, duration: tb.durationMin, open: starts.length > 0, starts: starts };
+    out[code] = { name: t.name, capacity: t.capacity, duration: tb.durationMin, requiresHeight: !!t.requiresHeight, open: starts.length > 0, starts: starts };
   });
   return out;
 }
@@ -365,17 +371,24 @@ function bookAlgueblue_(p) {
     { description: buildEventDesc_(bookingId, p, planLabel + ' dropoff', [ab.transferMarker, staff]) }
   );
 
+  const endStr = fromMin_(tStart + treat);
   appendBookingRow_({
     bookingId: bookingId, activity: 'Algueblue', planOption: planLabel,
-    date: dateStr, start: p.start, end: fromMin_(tStart + treat), people: p.people,
+    date: dateStr, start: p.start, end: endStr, people: p.people,
     name: p.name, email: p.email, phone: p.phone, staff: staff,
     eventIds: [treatEv.getId(), pickEv.getId(), dropEv.getId()].join(' | '),
     notes: 'transfer ' + ab.transferMin + 'min each way',
   });
 
+  sendConfirmationEmail_({
+    email: p.email, name: p.name, activity: 'Algueblue Thalassotherapy Spa', planOption: planLabel,
+    date: dateStr, start: p.start, end: endStr, people: p.people,
+    height: '', bookingId: bookingId,
+  });
+
   return {
     ok: true, bookingId: bookingId, activity: 'Algueblue', plan: planLabel,
-    date: dateStr, start: p.start, end: fromMin_(tStart + treat), transferStaff: staff,
+    date: dateStr, start: p.start, end: endStr, transferStaff: staff,
   };
 }
 
@@ -396,6 +409,8 @@ function bookTour_(p) {
   if (!v.ok) return v;
   if (!/^\d{2}:\d{2}$/.test(p.start || '')) return { ok: false, error: 'start (HH:mm) is required' };
   if (Number(p.people) > t.capacity) return { ok: false, error: 'Too many people (max ' + t.capacity + ').' };
+  const height = String(p.height || '').trim();
+  if (t.requiresHeight && !height) return { ok: false, error: 'Rider height(s) in cm is required for e-bike tours.' };
 
   const tb = BOOKING_CONFIG.tourBooking;
   const T = toMin_(p.start);
@@ -423,20 +438,29 @@ function bookTour_(p) {
   const bookingId = newBookingId_();
   const startDt = dateTimeFromParts_(p.date, p.start);
   const endDt = new Date(startDt.getTime() + dur * 60000);
+  const tags = [staff, 'People: ' + p.people];
+  if (height) tags.push('Height(cm): ' + height);
   const ev = cal.createEvent(
     '[Booking] ' + t.name + ' / ' + p.name + ' x' + p.people + ' (' + staff + ')',
     startDt, endDt,
-    { description: buildEventDesc_(bookingId, p, t.name, [staff, 'People: ' + p.people]) }
+    { description: buildEventDesc_(bookingId, p, t.name, tags) }
   );
 
+  const endStr = fromMin_(T + dur);
   appendBookingRow_({
     bookingId: bookingId, activity: t.name, planOption: '',
-    date: p.date, start: p.start, end: fromMin_(T + dur), people: p.people,
+    date: p.date, start: p.start, end: endStr, people: p.people,
     name: p.name, email: p.email, phone: p.phone, staff: staff,
-    eventIds: ev.getId(), notes: 'tour self-booking (180min)',
+    eventIds: ev.getId(), notes: 'tour (180min)' + (height ? ' | height(cm): ' + height : ''),
   });
 
-  return { ok: true, bookingId: bookingId, activity: t.name, date: p.date, start: p.start, end: fromMin_(T + dur), staff: staff };
+  sendConfirmationEmail_({
+    email: p.email, name: p.name, activity: t.name, planOption: '',
+    date: p.date, start: p.start, end: endStr, people: p.people,
+    height: height, bookingId: bookingId,
+  });
+
+  return { ok: true, bookingId: bookingId, activity: t.name, date: p.date, start: p.start, end: endStr, staff: staff };
 }
 
 // 開始 T のツアーを担当できるスタッフ（Kana/Sho）を1名返す。
@@ -507,6 +531,46 @@ function appendBookingRow_(b) {
     b.date, b.start, b.end, b.people, b.name, b.email, b.phone,
     b.staff, b.eventIds, b.notes || '',
   ]);
+}
+
+// 予約完了時の自動返信メール（英語・日時入り）。失敗しても予約自体は確定済みなので握りつぶす。
+function sendConfirmationEmail_(b) {
+  try {
+    if (!b.email) return;
+    const cfg = BOOKING_CONFIG.email;
+    const dateNice = Utilities.formatDate(dateTimeFromParts_(b.date, '00:00'), CONFIG.timeZone, 'EEE, MMM d, yyyy');
+    const activityLine = b.activity + (b.planOption ? ' (' + b.planOption + ')' : '');
+    const lines = [
+      'Dear ' + b.name + ',',
+      '',
+      'Thank you for your booking! We look forward to welcoming you in Himeji.',
+      '',
+      '--- Booking details ---',
+      'Activity: ' + activityLine,
+      'Date: ' + dateNice,
+      'Time: ' + b.start + ' - ' + b.end,
+      'Guests: ' + b.people,
+    ];
+    if (b.height) lines.push('Rider height(s): ' + b.height + ' cm');
+    lines.push('Booking ID: ' + b.bookingId);
+    lines.push('');
+    lines.push('Payment is made on site. To change or cancel, simply reply to this email.');
+    lines.push('');
+    lines.push('See you soon!');
+    lines.push(cfg.fromName);
+    lines.push(cfg.businessEmail);
+
+    MailApp.sendEmail({
+      to: b.email,
+      subject: 'Booking confirmed: ' + b.activity + ' on ' + dateNice + ' at ' + b.start,
+      body: lines.join('\n'),
+      name: cfg.fromName,
+      replyTo: cfg.businessEmail,
+      bcc: cfg.businessEmail,
+    });
+  } catch (err) {
+    console.error('Confirmation email failed: ' + (err && err.message || err));
+  }
 }
 
 function buildEventDesc_(bookingId, p, label, tags) {
