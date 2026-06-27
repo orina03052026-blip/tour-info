@@ -65,7 +65,7 @@ const BOOKING_CONFIG = {
   email: {
     businessEmail: 'comecomehimeji@gmail.com',
     fromName: 'Travel Network ACT · Himeji',
-    dayOfContact: 'comecomehimeji@gmail.com', // 当日連絡先（WhatsApp/電話が決まれば差し替え）
+    dayOfContact: 'WhatsApp +81 70-2013-1181', // 当日連絡先（07020131181）
   },
 
   // ツアー予約の時間モデル（2026-06-27 決定）: 全ツアー所要3時間、9:30〜15:00 の30分刻みで開始、
