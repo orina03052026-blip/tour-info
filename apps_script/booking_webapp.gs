@@ -45,20 +45,27 @@ const BOOKING_CONFIG = {
       plan02: { code: 'plan02', name: 'Premium Japanese Spa',     treatmentMin: 120, sameDay: true,  price: 27500, options: ['Facial', 'Body'] },
       plan03: { code: 'plan03', name: 'Ultimate J-Spa Retreat',   treatmentMin: 200, sameDay: false, price: 44000, options: [] },
     },
+    // お客様に選んでもらう送迎ホテル
+    pickupHotels: ['Hotel Nikko Himeji', 'Hotel Monterey Himeji', 'Daiwa Roynet Hotel Himeji', 'Setre Highland Villa Himeji'],
+    pickupNote: 'Our staff will pick you up at the hotel you selected. We will confirm the exact pickup time with you by email.',
   },
 
   // サイクリング / 城ガイド。スタッフ(Kana/Sho)の空きに収まる開始時刻を30分刻みで提示。
   // name は Availability シート/CSV の Tour 値・script.js の表示名と対応づける。
   tours: {
-    'ebike-castle': { code: 'ebike-castle', name: 'e-bike Ride around the Castle, Slurp Like a Local', sheetTour: 'e-bike Ride around the Castle', capacity: 4, weatherSensitive: true,  requiresHeight: true },
-    'ebike-sea':    { code: 'ebike-sea',    name: 'e-bike Ride to the Sea, Slurp Like a Local',        sheetTour: 'e-bike Ride to the Sea',        capacity: 4, weatherSensitive: true,  requiresHeight: true },
-    'castle-guide': { code: 'castle-guide', name: 'Himeji castle guide tour',                           sheetTour: 'Himeji castle guide tour',      capacity: 8, weatherSensitive: false, requiresHeight: false },
+    'ebike-castle': { code: 'ebike-castle', name: 'e-bike Ride around the Castle, Slurp Like a Local', sheetTour: 'e-bike Ride around the Castle', capacity: 4, weatherSensitive: true,  requiresHeight: true,  pricePerPerson: 7000,
+      meeting: 'Travel Network ACT (ACT Co., Ltd.), 1-41 Nonomachi, Himeji. From the South Exit of JR Himeji Station, walk about 2 minutes west along the Shinkansen viaduct.' },
+    'ebike-sea':    { code: 'ebike-sea',    name: 'e-bike Ride to the Sea, Slurp Like a Local',        sheetTour: 'e-bike Ride to the Sea',        capacity: 4, weatherSensitive: true,  requiresHeight: true,  pricePerPerson: 7000,
+      meeting: 'Travel Network ACT (ACT Co., Ltd.), 1-41 Nonomachi, Himeji. From the South Exit of JR Himeji Station, walk about 2 minutes west along the Shinkansen viaduct.' },
+    'castle-guide': { code: 'castle-guide', name: 'Himeji castle guide tour',                           sheetTour: 'Himeji castle guide tour',      capacity: 8, weatherSensitive: false, requiresHeight: false, pricePerPerson: 9800,
+      meeting: 'In front of the Tourist Information Center, just outside the Central Ticket Gate of JR Himeji Station.' },
   },
 
   // 確認メール（自動返信）
   email: {
     businessEmail: 'comecomehimeji@gmail.com',
     fromName: 'Travel Network ACT · Himeji',
+    dayOfContact: 'comecomehimeji@gmail.com', // 当日連絡先（WhatsApp/電話が決まれば差し替え）
   },
 
   // ツアー予約の時間モデル（2026-06-27 決定）: 全ツアー所要3時間、9:30〜15:00 の30分刻みで開始、
@@ -199,7 +206,7 @@ function computeAlgueblueAvailability_(dateStr, isToday) {
   });
 
   const ab = BOOKING_CONFIG.algueblue;
-  const result = { closed: closed, anyOpen: false, plans: {} };
+  const result = { closed: closed, anyOpen: false, pickupHotels: ab.pickupHotels, plans: {} };
   if (closed) {
     Object.keys(ab.plans).forEach(function (k) { result.plans[k] = { open: false, starts: [] }; });
     return result;
@@ -318,6 +325,8 @@ function bookAlgueblue_(p) {
   const v = validateCommon_(p);
   if (!v.ok) return v;
   if (!/^\d{2}:\d{2}$/.test(p.start || '')) return { ok: false, error: 'start (HH:mm) is required' };
+  const pickupHotel = String(p.pickup || '').trim();
+  if (ab.pickupHotels.indexOf(pickupHotel) === -1) return { ok: false, error: 'Please select a pickup hotel.' };
 
   const dateStr = p.date;
   const isToday = dateStr === formatDate_(startOfToday_());
@@ -355,20 +364,20 @@ function bookAlgueblue_(p) {
   const treatEv = cal.createEvent(
     '[Algueblue] ' + planLabel + ' / ' + p.name + ' x' + p.people,
     startDt, endDt,
-    { description: buildEventDesc_(bookingId, p, planLabel, [ab.marker]) }
+    { description: buildEventDesc_(bookingId, p, planLabel, [ab.marker, 'Pickup: ' + pickupHotel]) }
   );
 
   const pickStart = new Date(startDt.getTime() - ab.transferMin * 60000);
   const dropEnd = new Date(endDt.getTime() + ab.transferMin * 60000);
   const pickEv = cal.createEvent(
-    '[Algueblue送迎/pickup] ' + staff + ' - ' + p.name,
+    '[Algueblue送迎/pickup] ' + staff + ' - ' + p.name + ' @ ' + pickupHotel,
     pickStart, startDt,
-    { description: buildEventDesc_(bookingId, p, planLabel + ' pickup', [ab.transferMarker, staff]) }
+    { description: buildEventDesc_(bookingId, p, planLabel + ' pickup', [ab.transferMarker, staff, 'Pickup: ' + pickupHotel]) }
   );
   const dropEv = cal.createEvent(
-    '[Algueblue送迎/dropoff] ' + staff + ' - ' + p.name,
+    '[Algueblue送迎/dropoff] ' + staff + ' - ' + p.name + ' @ ' + pickupHotel,
     endDt, dropEnd,
-    { description: buildEventDesc_(bookingId, p, planLabel + ' dropoff', [ab.transferMarker, staff]) }
+    { description: buildEventDesc_(bookingId, p, planLabel + ' dropoff', [ab.transferMarker, staff, 'Pickup: ' + pickupHotel]) }
   );
 
   const endStr = fromMin_(tStart + treat);
@@ -377,13 +386,14 @@ function bookAlgueblue_(p) {
     date: dateStr, start: p.start, end: endStr, people: p.people,
     name: p.name, email: p.email, phone: p.phone, staff: staff,
     eventIds: [treatEv.getId(), pickEv.getId(), dropEv.getId()].join(' | '),
-    notes: 'transfer ' + ab.transferMin + 'min each way',
+    notes: 'transfer ' + ab.transferMin + 'min each way | pickup: ' + pickupHotel,
   });
 
   sendConfirmationEmail_({
     email: p.email, name: p.name, activity: 'Algueblue Thalassotherapy Spa', planOption: planLabel,
-    date: dateStr, start: p.start, end: endStr, people: p.people,
-    height: '', bookingId: bookingId,
+    date: dateStr, start: p.start, end: endStr, people: p.people, height: '', bookingId: bookingId,
+    locationLabel: 'Pickup', locationText: pickupHotel + ' — ' + ab.pickupNote,
+    pricePerPerson: plan.price,
   });
 
   return {
@@ -458,6 +468,8 @@ function bookTour_(p) {
     email: p.email, name: p.name, activity: t.name, planOption: '',
     date: p.date, start: p.start, end: endStr, people: p.people,
     height: height, bookingId: bookingId,
+    locationLabel: 'Meeting point', locationText: t.meeting,
+    pricePerPerson: t.pricePerPerson,
   });
 
   return { ok: true, bookingId: bookingId, activity: t.name, date: p.date, start: p.start, end: endStr, staff: staff };
@@ -552,9 +564,15 @@ function sendConfirmationEmail_(b) {
       'Guests: ' + b.people,
     ];
     if (b.height) lines.push('Rider height(s): ' + b.height + ' cm');
+    if (b.locationText) lines.push((b.locationLabel || 'Location') + ': ' + b.locationText);
+    if (b.pricePerPerson) {
+      lines.push('Price: ' + yen_(b.pricePerPerson) + ' per person'
+        + ' (total ' + yen_(b.pricePerPerson * Number(b.people || 1)) + ', paid on site)');
+    }
     lines.push('Booking ID: ' + b.bookingId);
     lines.push('');
-    lines.push('Payment is made on site. To change or cancel, simply reply to this email.');
+    lines.push('To change or cancel, simply reply to this email.');
+    lines.push('Day-of contact: ' + cfg.dayOfContact);
     lines.push('');
     lines.push('See you soon!');
     lines.push(cfg.fromName);
@@ -612,6 +630,8 @@ function readAvailabilityRows_() {
 function overlapsAny_(start, end, intervals) {
   return intervals.some(function (iv) { return start < iv.end && end > iv.start; });
 }
+
+function yen_(n) { return '¥' + Number(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 function toMin_(hhmm) { const a = String(hhmm).split(':'); return Number(a[0]) * 60 + Number(a[1]); }
 function fromMin_(m) { const h = Math.floor(m / 60), mm = m % 60; return ('0' + h).slice(-2) + ':' + ('0' + mm).slice(-2); }

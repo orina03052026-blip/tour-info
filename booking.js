@@ -16,6 +16,7 @@ const state = {
   activity: null,
   date: null,
   plan: null, option: null, start: null,  // Algueblue: plan/option/start; tours: start
+  pickup: null,                            // Algueblue: pickup hotel
   height: '',                              // e-bike tours: rider height(s)
   people: 1,
 };
@@ -63,7 +64,7 @@ function renderActivities() {
   ACTIVITIES.forEach((a) => {
     const b = el('button', 'choice' + (state.activity === a.code ? ' selected' : ''), esc(a.label));
     b.type = 'button';
-    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, height: '' }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, pickup: null, height: '' }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
 }
@@ -82,7 +83,7 @@ function renderDates() {
     const b = el('button', 'choice' + (state.date === d ? ' selected' : '') + (open ? '' : ' disabled'), fmtDateLabel(d, idx));
     b.type = 'button';
     b.disabled = !open;
-    b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null }); renderDates(); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null, pickup: null }); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
 }
@@ -168,6 +169,19 @@ function renderAlgueblueDetails(sec) {
   });
   if (!(plan.starts || []).length) tw.appendChild(el('p', 'muted', 'No open start times.'));
   sec.appendChild(tw);
+  if (!state.start) return;
+
+  // 送迎ホテルの選択（必須）
+  sec.appendChild(el('h3', 'step-title', 'Pickup hotel'));
+  const hw = el('div', 'choices');
+  (ab.pickupHotels || []).forEach((h) => {
+    const b = el('button', 'choice' + (state.pickup === h ? ' selected' : ''), esc(h));
+    b.type = 'button';
+    b.onclick = () => { state.pickup = h; renderDetails(); renderSummary(); };
+    hw.appendChild(b);
+  });
+  sec.appendChild(hw);
+  sec.appendChild(el('p', 'muted small', 'Our staff will pick you up here. We will confirm the pickup time by email.'));
 }
 
 function renderTourDetails(sec) {
@@ -225,6 +239,7 @@ function renderSummary() {
     lines.push(['Plan', p.name + (state.option ? ' (' + state.option + ')' : '')]);
   }
   if (state.start) lines.push(['Start', state.start]);
+  if (activityKind() === 'algueblue' && state.pickup) lines.push(['Pickup', state.pickup]);
   lines.push(['People', state.people]);
   if (activityRequiresHeight() && state.height) lines.push(['Height (cm)', state.height]);
   $('#summary').innerHTML = lines.map(([k, v]) => '<div class="sum-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('');
@@ -235,7 +250,7 @@ function isReady() {
   if (!state.activity || !state.date || !state.people) return false;
   if (!state.name || !state.email) return false;
   if (activityKind() === 'algueblue') {
-    if (!state.plan || !state.start) return false;
+    if (!state.plan || !state.start || !state.pickup) return false;
     const plan = state.availability[state.date].algueblue.plans[state.plan];
     if (plan.options && plan.options.length && !state.option) return false;
     return true;
@@ -252,6 +267,7 @@ async function submit() {
     activity: state.activity, date: state.date, people: state.people,
     name: state.name, email: state.email, phone: state.phone || '', note: state.note || '',
     plan: state.plan, option: state.option, start: state.start, height: state.height || '',
+    pickup: state.pickup || '',
   };
   try {
     const res = await fetch(WEBAPP_URL, {
