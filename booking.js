@@ -219,7 +219,7 @@ function renderContact(sec) {
     const f = el('label', 'field');
     f.appendChild(el('span', 'field-label', label));
     const input = el('input'); input.type = type; input.id = 'f-' + key; input.value = state[key] || '';
-    input.oninput = () => { state[key] = input.value; };
+    input.oninput = () => { state[key] = input.value; renderSummary(); };
     f.appendChild(input);
     sec.appendChild(f);
   });
