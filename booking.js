@@ -6,20 +6,19 @@ const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyL_cqU6-SkSg7yNXCSt
 // アルグブルーの「先の予約」で表示する日数（今日から HORIZON_DAYS 日先まで）。GAS の algueblueOpenDays と揃える。
 const HORIZON_DAYS = 30;
 
-// ▼メンテナンス用スイッチ。true にすると申込フォームを止め、案内だけ表示する（作業中は true）。
-//   作業が終わったら false に戻して push すると通常運用に復帰する。
+// ▼メンテナンス用スイッチ。true の間は「停止対象アクティビティ」だけ申込を止め、案内を表示する。
+//   ツアー等は通常どおり受付。作業が終わったら false に戻して push すれば通常運用に復帰する。
 const MAINTENANCE = true;
+// 停止対象（activityKind の値）。今回はアルグブルーのみ停止。
+const MAINTENANCE_KINDS = ['algueblue'];
 const MAINTENANCE_MSG =
-  '<h3>ただいまシステムメンテナンス中です</h3>'
-  + '<p>オンライン予約を一時的に停止しています。ご不便をおかけしますが、少し時間をおいて再度お試しください。</p>'
-  + '<p class="muted">Online booking is temporarily paused for maintenance. Please try again a little later.</p>'
+  '<h3>アルグブルーはただいま予約調整中です</h3>'
+  + '<p>アルグブルーのオンライン予約を一時的に停止しています。ご不便をおかけしますが、少し時間をおいて再度お試しください。</p>'
+  + '<p class="muted">Algueblue online booking is temporarily paused. Please try again a little later.</p>'
   + '<p class="muted small">お急ぎの場合 / Urgent: WhatsApp +81 70-2013-1181 ・ comecomehimeji@gmail.com</p>';
 
-function showMaintenance() {
-  const body = $('#form-body');
-  if (body) body.innerHTML = '<section class="block"><div class="maint-notice">' + MAINTENANCE_MSG + '</div></section>';
-  const done = $('#done'); if (done) done.hidden = true;
-}
+// 選択中のアクティビティが停止対象か
+function activityUnderMaintenance() { return MAINTENANCE && MAINTENANCE_KINDS.indexOf(activityKind()) !== -1; }
 
 const ACTIVITIES = [
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue' },
@@ -112,7 +111,7 @@ async function init() {
     }
     if (state.activity) {
       renderDates();
-      if (state.date) { maybePresetPlan(); renderDetails(); renderSummary(); }
+      if (state.date && !activityUnderMaintenance()) { maybePresetPlan(); renderDetails(); renderSummary(); }
     }
   } catch (err) {
     $('#status').textContent = 'Could not load availability. Please try again later.';
@@ -153,6 +152,13 @@ function renderDates() {
   updateChrome();
   if (!state.activity || !state.availability) { sec.hidden = true; return; }
   sec.hidden = false;
+  // 停止対象アクティビティ（アルグブルー）は案内のみ表示し、日付・詳細・確定は出さない。
+  if (activityUnderMaintenance()) {
+    wrap.innerHTML = '<div class="maint-notice">' + MAINTENANCE_MSG + '</div>';
+    $('#details-section').hidden = true;
+    $('#summary-section').hidden = true;
+    return;
+  }
   // アルグブルーは「先の予約」対応の月カレンダー。ツアーは従来どおり今日・明日の2択。
   if (activityKind() === 'algueblue') { renderAlgueblueCalendar(wrap); return; }
   state.dates.forEach((d, idx) => {
@@ -456,6 +462,7 @@ function isReady() {
 }
 
 async function submit() {
+  if (activityUnderMaintenance()) return; // 停止対象は送信させない（防御）
   $('#submit-btn').disabled = true;
   $('#status').textContent = 'Sending…';
   const body = {
@@ -496,7 +503,6 @@ function showDone(data) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (MAINTENANCE) { showMaintenance(); return; } // 作業中は申込を止める
   $('#submit-btn').addEventListener('click', submit);
   init();
 });
