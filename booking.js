@@ -42,6 +42,10 @@ function updateChrome() {
   if (pay) pay.textContent = alg
     ? '今のお支払いはありません（当日現地払い）。 / No payment is taken now — you pay on site.'
     : 'No payment is taken now — you pay on site.';
+  const priv = $('#privacy-note');
+  if (priv) priv.textContent = alg
+    ? 'ご入力の個人情報（お名前・ご連絡先など）は、ご予約の受付・確認のご連絡にのみ使用し、法令に基づく場合を除き第三者へ提供しません。データはGoogleのサービス上に安全に保管します。お問い合わせ：comecomehimeji@gmail.com（株式会社あくと） / The personal information you provide is used only to process and confirm your booking; we do not share it with third parties except as required by law. Data is stored securely on Google. Contact: comecomehimeji@gmail.com (ACT Co., Ltd.).'
+    : 'The personal information you provide (name and contact details) is used only to process and confirm your booking. We do not share it with third parties except as required by law. Your data is stored securely on Google services. Contact: comecomehimeji@gmail.com (ACT Co., Ltd.).';
 }
 
 function fmtDateLabel(dateStr, idx) {
