@@ -114,3 +114,43 @@ body {
 }
 .done h2 { color: #1f3a4a; margin-bottom: 8px; }
 .done p { margin: 4px 0; }
+
+/* ---- アルグブルー用 月カレンダー ---- */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-title { font-size: 1rem; font-weight: 700; color: #1f3a4a; }
+.cal-nav {
+  border: 1.5px solid #d7e3e8; background: #fff; color: #1f3a4a;
+  border-radius: 10px; width: 40px; height: 36px; font-size: 1.2rem; line-height: 1;
+  cursor: pointer; transition: all 0.15s ease;
+}
+.cal-nav:hover:not(:disabled) { border-color: #009efd; }
+.cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-dow { margin-bottom: 4px; }
+.cal-dowcell { text-align: center; font-size: 0.7rem; color: #5b7280; padding: 2px 0; }
+
+.cal-cell {
+  aspect-ratio: 1 / 1; border: 1.5px solid #d7e3e8; background: #fff; color: #1f3a4a;
+  border-radius: 10px; font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  cursor: pointer; transition: all 0.15s ease; padding: 0;
+}
+.cal-cell.empty, .cal-cell.out { border: none; background: transparent; cursor: default; }
+.cal-cell.closed { color: #c5d3da; background: #f7fbfc; cursor: not-allowed; }
+.cal-cell.open:hover { border-color: #009efd; }
+.cal-cell.open { border-color: #2af598; box-shadow: inset 0 0 0 1px rgba(42, 245, 152, 0.35); font-weight: 600; }
+.cal-cell.today { position: relative; }
+.cal-cell.today::after {
+  content: ''; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: #009efd;
+}
+.cal-cell.selected {
+  border-color: transparent; color: #fff; box-shadow: 0 4px 10px rgba(0, 158, 253, 0.3);
+  background: linear-gradient(135deg, #2af598, #009efd);
+}
+.cal-cell.selected.today::after { background: #fff; }
+
+/* ---- メンテナンス案内 ---- */
+.maint-notice { text-align: center; padding: 20px 8px; }
+.maint-notice h3 { font-size: 1.15rem; color: #1f3a4a; margin-bottom: 10px; }
+.maint-notice p { margin: 6px 0; }

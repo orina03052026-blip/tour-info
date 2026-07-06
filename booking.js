@@ -3,6 +3,24 @@
  * Deploy the Web App, then paste its /exec URL below. */
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyL_cqU6-SkSg7yNXCSterbVFVM4lPp8d6W4mJQyvXKSh7Qqu2Njsr_pPz11v8rvJw/exec';
 
+// アルグブルーの「先の予約」で表示する日数（今日から HORIZON_DAYS 日先まで）。GAS の algueblueOpenDays と揃える。
+const HORIZON_DAYS = 30;
+
+// ▼メンテナンス用スイッチ。true にすると申込フォームを止め、案内だけ表示する（作業中は true）。
+//   作業が終わったら false に戻して push すると通常運用に復帰する。
+const MAINTENANCE = true;
+const MAINTENANCE_MSG =
+  '<h3>ただいまシステムメンテナンス中です</h3>'
+  + '<p>オンライン予約を一時的に停止しています。ご不便をおかけしますが、少し時間をおいて再度お試しください。</p>'
+  + '<p class="muted">Online booking is temporarily paused for maintenance. Please try again a little later.</p>'
+  + '<p class="muted small">お急ぎの場合 / Urgent: WhatsApp +81 70-2013-1181 ・ comecomehimeji@gmail.com</p>';
+
+function showMaintenance() {
+  const body = $('#form-body');
+  if (body) body.innerHTML = '<section class="block"><div class="maint-notice">' + MAINTENANCE_MSG + '</div></section>';
+  const done = $('#done'); if (done) done.hidden = true;
+}
+
 const ACTIVITIES = [
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue' },
   { code: 'ebike-castle', label: 'e-bike Ride around the Castle',    kind: 'tour' },
@@ -11,8 +29,11 @@ const ACTIVITIES = [
 ];
 
 const state = {
-  availability: null,   // { 'YYYY-MM-DD': { algueblue, tours } }
-  dates: [],            // ordered date strings (today, tomorrow)
+  availability: null,   // 日付キャッシュ { 'YYYY-MM-DD': { algueblue, tours } }（初期は今日・明日。先の日はクリック時に単日追加）
+  dates: [],            // ツアー用の日付（today, tomorrow）
+  openDays: [],         // アルグブルーの予約候補日（出勤予定あり＆休業でない日）'YYYY-MM-DD' の配列
+  calMonth: null,       // アルグブルーのカレンダーで表示中の月 {y, m(0-11)}
+  presetPlan: null,     // ?plan= で来たプラン（WPのプランボタンから）
   activity: null,
   date: null,
   plan: null, option: null, start: null,  // Algueblue: plan/option/start; tours: start
@@ -65,27 +86,48 @@ function subtractMinutes(hhmm, min) {
 }
 
 async function init() {
-  // 今日・明日ページのカードから activity / date を引き継いで事前選択（日付の選び直しを省く）
+  // 今日・明日ページのカードや WPのプランボタンから activity / date / plan を引き継いで事前選択
   const qs = new URLSearchParams(location.search);
   const preset = qs.get('activity');
   if (preset && ACTIVITIES.some((a) => a.code === preset)) state.activity = preset;
   state.presetDate = qs.get('date') || null;
+  const presetPlan = qs.get('plan');
+  if (presetPlan && ['plan01', 'plan02', 'plan03'].indexOf(presetPlan) !== -1) state.presetPlan = presetPlan;
   renderActivities();
   try {
-    const res = await fetch(WEBAPP_URL + '?action=availability', { cache: 'no-store' });
-    const data = await res.json();
+    // 今日・明日の空き（全アクティビティ共通）と、アルグブルーの候補日（60日分）を並行取得
+    const [availRes, openRes] = await Promise.all([
+      fetch(WEBAPP_URL + '?action=availability', { cache: 'no-store' }),
+      fetch(WEBAPP_URL + '?action=algueblueOpenDays&days=' + HORIZON_DAYS, { cache: 'no-store' }).catch(() => null),
+    ]);
+    const data = await availRes.json();
     if (!data.ok) throw new Error(data.error || 'load failed');
-    state.availability = data.days;
-    state.dates = Object.keys(data.days).sort();
-    // 事前選択を反映。date も渡されていて受付可なら選択し、開始時刻の選択へ直行
-    if (state.activity && state.presetDate && state.dates.indexOf(state.presetDate) !== -1) {
+    state.availability = data.days;              // キャッシュに今日・明日を投入
+    state.dates = Object.keys(data.days).sort(); // ツアー用の日付リスト
+    if (openRes) { try { const od = await openRes.json(); if (od && od.ok) state.openDays = od.openDays || []; } catch (e) { /* 候補日が取れなくても今日明日は動く */ } }
+    // 事前選択を反映（今日・明日のカードから来た場合。先の日付は presetDate に来ない想定）
+    if (state.activity && state.presetDate && state.availability[state.presetDate]) {
       state.date = state.presetDate;
       if (!isDateOpen(state.date)) state.date = null; // 満席/休業なら日付選択に戻す
     }
-    if (state.activity) { renderDates(); renderDetails(); renderSummary(); }
+    if (state.activity) {
+      renderDates();
+      if (state.date) { maybePresetPlan(); renderDetails(); renderSummary(); }
+    }
   } catch (err) {
     $('#status').textContent = 'Could not load availability. Please try again later.';
     console.error(err);
+  }
+}
+
+// ?plan= で来たプランを、その日に選択可能なら自動選択する（WPのプランボタン用）
+function maybePresetPlan() {
+  if (!state.presetPlan || state.plan) return;
+  if (activityKind() !== 'algueblue' || !state.date) return;
+  const day = state.availability[state.date];
+  const ab = day && day.algueblue;
+  if (ab && ab.plans && ab.plans[state.presetPlan] && ab.plans[state.presetPlan].open) {
+    state.plan = state.presetPlan;
   }
 }
 
@@ -111,6 +153,8 @@ function renderDates() {
   updateChrome();
   if (!state.activity || !state.availability) { sec.hidden = true; return; }
   sec.hidden = false;
+  // アルグブルーは「先の予約」対応の月カレンダー。ツアーは従来どおり今日・明日の2択。
+  if (activityKind() === 'algueblue') { renderAlgueblueCalendar(wrap); return; }
   state.dates.forEach((d, idx) => {
     const open = isDateOpen(d);
     const b = el('button', 'choice' + (state.date === d ? ' selected' : '') + (open ? '' : ' disabled'), fmtDateLabel(d, idx));
@@ -119,6 +163,100 @@ function renderDates() {
     b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null, pickup: null }); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
+}
+
+/* ---- アルグブルー用 月カレンダー（今日〜HORIZON_DAYS日先） ---- */
+const CAL_MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const CAL_DOW = ['日/Su', '月/Mo', '火/Tu', '水/We', '木/Th', '金/Fr', '土/Sa'];
+
+const todayYmd = () => dateToYmd(new Date());
+const ymdToDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const dateToYmd = (dt) => dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+const addDaysYmd = (s, n) => { const dt = ymdToDate(s); dt.setDate(dt.getDate() + n); return dateToYmd(dt); };
+
+// その日がアルグブルーで予約可能か。候補日(openDays)にあり、かつ（キャッシュ済で満席と判明していない）
+function isAlgueblueDayOpen(ds) {
+  if ((state.openDays || []).indexOf(ds) === -1) return false;
+  const cached = state.availability[ds];
+  if (cached && cached.algueblue && cached.algueblue.anyOpen === false) return false;
+  return true;
+}
+
+function renderAlgueblueCalendar(wrap) {
+  const today = todayYmd();
+  const endYmd = addDaysYmd(today, HORIZON_DAYS - 1);
+  const todayD = ymdToDate(today), endD = ymdToDate(endYmd);
+  if (!state.calMonth) state.calMonth = { y: todayD.getFullYear(), m: todayD.getMonth() };
+  const y = state.calMonth.y, m = state.calMonth.m;
+
+  // 月移動（表示範囲＝今日の月〜HORIZON末日の月）
+  const prevAllowed = (y > todayD.getFullYear()) || (y === todayD.getFullYear() && m > todayD.getMonth());
+  const nextAllowed = (y < endD.getFullYear()) || (y === endD.getFullYear() && m < endD.getMonth());
+  const head = el('div', 'cal-head');
+  const prev = el('button', 'cal-nav', '‹'); prev.type = 'button'; prev.disabled = !prevAllowed;
+  prev.onclick = () => { state.calMonth = (m === 0) ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; renderDates(); };
+  const next = el('button', 'cal-nav', '›'); next.type = 'button'; next.disabled = !nextAllowed;
+  next.onclick = () => { state.calMonth = (m === 11) ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; renderDates(); };
+  head.appendChild(prev);
+  head.appendChild(el('div', 'cal-title', (m + 1) + '月 / ' + CAL_MONTHS_EN[m] + ' ' + y));
+  head.appendChild(next);
+  wrap.appendChild(head);
+
+  const dow = el('div', 'cal-grid cal-dow');
+  CAL_DOW.forEach((d) => dow.appendChild(el('div', 'cal-dowcell', d)));
+  wrap.appendChild(dow);
+
+  const grid = el('div', 'cal-grid');
+  const startPad = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  for (let i = 0; i < startPad; i++) grid.appendChild(el('div', 'cal-cell empty'));
+  for (let dnum = 1; dnum <= daysInMonth; dnum++) {
+    const ds = dateToYmd(new Date(y, m, dnum));
+    const inRange = ds >= today && ds <= endYmd;
+    const open = inRange && isAlgueblueDayOpen(ds);
+    const cls = 'cal-cell' + (inRange ? (open ? ' open' : ' closed') : ' out')
+      + (state.date === ds ? ' selected' : '') + (ds === today ? ' today' : '');
+    const cell = el('button', cls, String(dnum));
+    cell.type = 'button';
+    cell.disabled = !open;
+    if (open) cell.onclick = () => selectAlgueblueDate(ds);
+    grid.appendChild(cell);
+  }
+  wrap.appendChild(grid);
+
+  if (!(state.openDays || []).length) {
+    wrap.appendChild(el('p', 'muted small',
+      '現在ご予約いただける日がありません。カレンダーにスタッフの出勤予定が入り次第、ここに表示されます。 / No open dates yet — dates appear once staff shifts are added to the calendar.'));
+  }
+}
+
+// カレンダーで日付を選択。未取得なら単日の空きを取得してから詳細を描画。
+async function selectAlgueblueDate(ds) {
+  Object.assign(state, { date: ds, plan: null, option: null, start: null, pickup: null });
+  renderDates();
+  if (!state.availability[ds]) {
+    const sec = $('#details-section');
+    sec.hidden = false;
+    sec.innerHTML = '';
+    sec.appendChild(el('p', 'muted', '空き状況を確認中… / Checking availability…'));
+    try {
+      const res = await fetch(WEBAPP_URL + '?action=availability&date=' + ds, { cache: 'no-store' });
+      const data = await res.json();
+      if (!(data.ok && data.days && data.days[ds])) throw new Error(data.error || 'load failed');
+      state.availability[ds] = data.days[ds];
+    } catch (err) {
+      const sec2 = $('#details-section');
+      sec2.innerHTML = '';
+      sec2.appendChild(el('p', 'muted', '空き状況を取得できませんでした。もう一度お試しください。 / Could not load availability. Please try again.'));
+      console.error(err);
+      return;
+    }
+    // 満席と判明したらカレンダー表示を更新（クリック不可に）
+    renderDates();
+  }
+  maybePresetPlan();
+  renderDetails();
+  renderSummary();
 }
 
 function isDateOpen(d) {
@@ -358,6 +496,7 @@ function showDone(data) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (MAINTENANCE) { showMaintenance(); return; } // 作業中は申込を止める
   $('#submit-btn').addEventListener('click', submit);
   init();
 });
