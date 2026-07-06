@@ -229,16 +229,17 @@ const ALGUEBLUE_SVG = `
 
 // Algueblue は1日1枚・AM/PM 縛りなし。受付可(Available)／満席(Fully booked)の2状態。
 function renderAlgueblueCard(open, date) {
+  // アルグブルーのみ日本語＋英語併記（ツアーカードは英語のまま）
   const status = open
-    ? { text: 'Available', className: 'status-available' }
-    : { text: 'Fully booked', className: 'status-fully' };
+    ? { text: '空きあり / Available', className: 'status-available' }
+    : { text: '満席 / Fully booked', className: 'status-fully' };
   const fullyClass = open ? '' : ' fully-booked';
   return `
     <div class="tour-card${fullyClass}">
       <div class="tour-name">${escapeHtml(ALGUEBLUE_NAME)}</div>
       <span class="tour-status ${status.className}">${status.text}</span>
       <div class="tour-illustration illus-spa">${ALGUEBLUE_SVG}</div>
-      <a class="tour-button" href="${escapeHtml(bookingUrlFor('algueblue', date))}" target="_blank" rel="noopener noreferrer">Book Now!</a>
+      <a class="tour-button" href="${escapeHtml(bookingUrlFor('algueblue', date))}" target="_blank" rel="noopener noreferrer">予約する / Book Now!</a>
     </div>
   `;
 }

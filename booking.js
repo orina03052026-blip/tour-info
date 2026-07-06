@@ -25,6 +25,25 @@ const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// クライアント方針：アルグブルーのみ日本語＋英語併記。ツアーは英語のみ。
+const isAlg = () => activityKind() === 'algueblue';
+const bi = (ja, en) => isAlg() ? (ja + ' / ' + en) : en;
+
+// 共有の静的テキスト（日付選択・Summary・確定ボタン等）を、選択中アクティビティに合わせて切替。
+function updateChrome() {
+  const alg = isAlg();
+  const dateH = document.querySelector('#date-section .step-title');
+  if (dateH) dateH.textContent = alg ? '日付を選択 / Choose a date' : 'Choose a date';
+  const sumH = document.querySelector('#summary-section .step-title');
+  if (sumH) sumH.textContent = alg ? 'ご予約内容 / Summary' : 'Summary';
+  const btn = $('#submit-btn');
+  if (btn) btn.textContent = alg ? '予約する / Confirm booking' : 'Confirm booking';
+  const pay = document.querySelector('#summary-section .muted.small');
+  if (pay) pay.textContent = alg
+    ? '今のお支払いはありません（当日現地払い）。 / No payment is taken now — you pay on site.'
+    : 'No payment is taken now — you pay on site.';
+}
+
 function fmtDateLabel(dateStr, idx) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -85,6 +104,7 @@ function renderDates() {
   const sec = $('#date-section');
   const wrap = $('#dates');
   wrap.innerHTML = '';
+  updateChrome();
   if (!state.activity || !state.availability) { sec.hidden = true; return; }
   sec.hidden = false;
   state.dates.forEach((d, idx) => {
@@ -111,6 +131,7 @@ function renderDetails() {
   sec.innerHTML = '';
   if (!state.activity || !state.date) { sec.hidden = true; return; }
   sec.hidden = false;
+  updateChrome();
   if (activityKind() === 'algueblue') renderAlgueblueDetails(sec);
   else renderTourDetails(sec);
   renderPeople(sec);
@@ -140,7 +161,7 @@ function renderHeight(sec) {
 
 function renderAlgueblueDetails(sec) {
   const ab = state.availability[state.date].algueblue;
-  sec.appendChild(el('h3', 'step-title', 'Choose a plan'));
+  sec.appendChild(el('h3', 'step-title', 'プランを選択 / Choose a plan'));
   const planWrap = el('div', 'choices');
   Object.keys(ab.plans).forEach((key) => {
     const p = ab.plans[key];
@@ -151,13 +172,13 @@ function renderAlgueblueDetails(sec) {
     b.onclick = () => { Object.assign(state, { plan: key, option: null, pickup: null, start: null }); renderDetails(); renderSummary(); };
     planWrap.appendChild(b);
   });
-  if (!planWrap.children.length) planWrap.appendChild(el('p', 'muted', 'No plan available on this date.'));
+  if (!planWrap.children.length) planWrap.appendChild(el('p', 'muted', 'この日は選べるプランがありません。 / No plan available on this date.'));
   sec.appendChild(planWrap);
   if (!state.plan) return;
 
   const plan = ab.plans[state.plan];
   if (plan.options && plan.options.length) {
-    sec.appendChild(el('h3', 'step-title', 'Course'));
+    sec.appendChild(el('h3', 'step-title', 'コース / Course'));
     const ow = el('div', 'choices');
     plan.options.forEach((o) => {
       const b = el('button', 'choice' + (state.option === o ? ' selected' : ''), esc(o));
@@ -170,7 +191,7 @@ function renderAlgueblueDetails(sec) {
 
   // 送迎ホテルを先に選ぶ（ホテルで送迎時間が違い、取れる開始時刻も変わるため）
   const startsByHotel = plan.startsByHotel || {};
-  sec.appendChild(el('h3', 'step-title', 'Pickup hotel'));
+  sec.appendChild(el('h3', 'step-title', 'お迎え場所 / Pickup hotel'));
   const hw = el('div', 'choices');
   (ab.pickupHotels || []).forEach((h) => {
     const openForHotel = (startsByHotel[h.name] || []).length > 0;
@@ -181,31 +202,33 @@ function renderAlgueblueDetails(sec) {
     hw.appendChild(b);
   });
   sec.appendChild(hw);
-  sec.appendChild(el('p', 'muted small', 'Our staff will pick you up at your hotel. The start times below already include travel to Algueblue.'));
+  sec.appendChild(el('p', 'muted small', 'ご宿泊のホテルまでお迎えに伺います。下の開始時刻は送迎の移動時間を含んだ表示です。 / Our staff will pick you up at your hotel. The start times below already include travel to Algueblue.'));
   if (!state.pickup) return;
 
   // 選んだホテルで取れる開始時刻だけを表示。各ボタンに「施術開始」と「お迎え時刻」を併記して分かりやすく。
   const starts = startsByHotel[state.pickup] || [];
   const hotel = (ab.pickupHotels || []).find((x) => x.name === state.pickup);
-  sec.appendChild(el('h3', 'step-title', 'Treatment start time'));
-  sec.appendChild(el('p', 'muted small', 'Pick when your treatment starts — the hotel pickup time is shown under each.'));
+  sec.appendChild(el('h3', 'step-title', '施術開始時間 / Treatment start time'));
+  sec.appendChild(el('p', 'muted small', '施術が始まる時刻をお選びください。各ボタンの下にお迎え時刻を表示しています。 / Pick when your treatment starts — the hotel pickup time is shown under each.'));
   const tw = el('div', 'choices times');
   starts.forEach((t) => {
     const pk = (hotel && hotel.toSalonMin != null) ? subtractMinutes(t, hotel.toSalonMin) : null;
     const label = '<span class="time-main">' + esc(t) + '</span>'
-      + (pk ? '<span class="pickup-sub">pickup ' + esc(pk) + '</span>' : '');
+      + (pk ? '<span class="pickup-sub">お迎え/pickup ' + esc(pk) + '</span>' : '');
     const b = el('button', 'choice time' + (state.start === t ? ' selected' : ''), label);
     b.type = 'button';
     b.onclick = () => { state.start = t; renderDetails(); renderSummary(); };
     tw.appendChild(b);
   });
-  if (!starts.length) tw.appendChild(el('p', 'muted', 'No open start times for this hotel. Please try another pickup hotel.'));
+  if (!starts.length) tw.appendChild(el('p', 'muted', 'このホテルで空いている開始時刻がありません。別のお迎え場所をお試しください。 / No open start times for this hotel. Please try another pickup hotel.'));
   sec.appendChild(tw);
 
   // 選択後の確認（施術開始とお迎え時刻を明示）
   if (state.start && hotel && hotel.toSalonMin != null) {
     const pk = subtractMinutes(state.start, hotel.toSalonMin);
-    sec.appendChild(el('p', 'muted small', 'Treatment starts ' + esc(state.start) + ' · hotel pickup around ' + esc(pk) + ' (we will confirm by email).'));
+    sec.appendChild(el('p', 'muted small',
+      '施術開始 ' + esc(state.start) + ' ・ お迎え目安 ' + esc(pk) + '（時間はメールで確定します）'
+      + ' / Treatment starts ' + esc(state.start) + ' · hotel pickup around ' + esc(pk) + ' (we will confirm by email).'));
   }
 }
 
@@ -224,7 +247,7 @@ function renderTourDetails(sec) {
 }
 
 function renderPeople(sec) {
-  sec.appendChild(el('h3', 'step-title', 'Number of people'));
+  sec.appendChild(el('h3', 'step-title', bi('人数', 'Number of people')));
   const row = el('div', 'people-row');
   const input = el('input'); input.type = 'number'; input.min = '1'; input.max = '20'; input.value = state.people;
   input.oninput = () => { state.people = Math.max(1, Number(input.value) || 1); renderSummary(); };
@@ -233,12 +256,12 @@ function renderPeople(sec) {
 }
 
 function renderContact(sec) {
-  sec.appendChild(el('h3', 'step-title', 'Your details'));
+  sec.appendChild(el('h3', 'step-title', bi('お客様情報', 'Your details')));
   const fields = [
-    ['name', 'Full name *', 'text'],
-    ['email', 'Email *', 'email'],
-    ['phone', 'Phone', 'tel'],
-    ['note', 'Note (optional)', 'text'],
+    ['name', bi('お名前', 'Full name') + ' *', 'text'],
+    ['email', bi('メール', 'Email') + ' *', 'email'],
+    ['phone', bi('電話番号', 'Phone'), 'tel'],
+    ['note', bi('備考（任意）', 'Note (optional)'), 'text'],
   ];
   fields.forEach(([key, label, type]) => {
     const f = el('label', 'field');
@@ -255,21 +278,22 @@ function renderSummary() {
   const sec = $('#summary-section');
   const ready = isReady();
   sec.hidden = !state.activity || !state.date;
+  updateChrome();
   const a = ACTIVITIES.find((x) => x.code === state.activity);
   const lines = [];
-  if (a) lines.push(['Activity', a.label]);
-  if (state.date) lines.push(['Date', state.date]);
+  if (a) lines.push([bi('アクティビティ', 'Activity'), a.label]);
+  if (state.date) lines.push([bi('日付', 'Date'), state.date]);
   if (activityKind() === 'algueblue' && state.plan) {
     const p = state.availability[state.date].algueblue.plans[state.plan];
-    lines.push(['Plan', p.name + (state.option ? ' (' + state.option + ')' : '')]);
+    lines.push([bi('プラン', 'Plan'), p.name + (state.option ? ' (' + state.option + ')' : '')]);
   }
-  if (state.start) lines.push([activityKind() === 'algueblue' ? 'Treatment start' : 'Start', state.start]);
+  if (state.start) lines.push([activityKind() === 'algueblue' ? bi('施術開始', 'Treatment start') : 'Start', state.start]);
   if (activityKind() === 'algueblue' && state.pickup) {
-    lines.push(['Pickup hotel', state.pickup]);
+    lines.push([bi('お迎え場所', 'Pickup hotel'), state.pickup]);
     const hotel = (state.availability[state.date].algueblue.pickupHotels || []).find((x) => x.name === state.pickup);
-    if (hotel && hotel.toSalonMin != null && state.start) lines.push(['Pickup time', subtractMinutes(state.start, hotel.toSalonMin)]);
+    if (hotel && hotel.toSalonMin != null && state.start) lines.push([bi('お迎え時刻', 'Pickup time'), subtractMinutes(state.start, hotel.toSalonMin)]);
   }
-  lines.push(['People', state.people]);
+  lines.push([bi('人数', 'People'), state.people]);
   if (activityRequiresHeight() && state.height) lines.push(['Height (cm)', state.height]);
   $('#summary').innerHTML = lines.map(([k, v]) => '<div class="sum-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('');
   $('#submit-btn').disabled = !ready;
@@ -316,11 +340,17 @@ async function submit() {
 function showDone(data) {
   $('#form-body').hidden = true;
   $('#done').hidden = false;
+  const alg = isAlg();
+  const heading = alg ? 'ご予約を受け付けました / Booking request received' : 'Booking request received';
+  const refLine = (alg ? '予約番号 / Your reference: ' : 'Your reference is ') + '<b>' + esc(data.bookingId) + '</b>.';
+  const note = alg
+    ? '枠をお取りしています。まもなくメールで確定のご連絡をします。お支払いは当日現地払いです。<br>We are holding your slot and will confirm by email shortly. Payment is made on site.'
+    : 'We are holding your slot and will confirm by email shortly. Payment is made on site.';
   $('#done').innerHTML =
     '<div class="done-check">✓</div>' +
-    '<h2>Booking request received</h2>' +
-    '<p>Your reference is <b>' + esc(data.bookingId) + '</b>.</p>' +
-    '<p class="muted">We are holding your slot and will confirm by email shortly. Payment is made on site.</p>';
+    '<h2>' + heading + '</h2>' +
+    '<p>' + refLine + '</p>' +
+    '<p class="muted">' + note + '</p>';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
