@@ -60,7 +60,10 @@ body {
 .choice.selected .muted { color: rgba(255, 255, 255, 0.85); }
 .choice.disabled { opacity: 0.4; cursor: not-allowed; }
 .choice.plan { align-items: flex-start; min-width: 200px; }
-.choice.time { padding: 9px 14px; font-variant-numeric: tabular-nums; }
+.choice.time { padding: 9px 14px; font-variant-numeric: tabular-nums; align-items: center; }
+.choice.time .time-main { font-size: 0.95rem; font-weight: 600; }
+.choice.time .pickup-sub { font-size: 0.7rem; color: #5b7280; font-variant-numeric: tabular-nums; }
+.choice.time.selected .pickup-sub { color: rgba(255, 255, 255, 0.9); }
 
 .muted { color: #5b7280; font-size: 0.85rem; }
 .small { font-size: 0.8rem; }

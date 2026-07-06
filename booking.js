@@ -184,12 +184,17 @@ function renderAlgueblueDetails(sec) {
   sec.appendChild(el('p', 'muted small', 'Our staff will pick you up at your hotel. The start times below already include travel to Algueblue.'));
   if (!state.pickup) return;
 
-  // 選んだホテルで取れる開始時刻だけを表示
+  // 選んだホテルで取れる開始時刻だけを表示。各ボタンに「施術開始」と「お迎え時刻」を併記して分かりやすく。
   const starts = startsByHotel[state.pickup] || [];
-  sec.appendChild(el('h3', 'step-title', 'Start time'));
+  const hotel = (ab.pickupHotels || []).find((x) => x.name === state.pickup);
+  sec.appendChild(el('h3', 'step-title', 'Treatment start time'));
+  sec.appendChild(el('p', 'muted small', 'Pick when your treatment starts — the hotel pickup time is shown under each.'));
   const tw = el('div', 'choices times');
   starts.forEach((t) => {
-    const b = el('button', 'choice time' + (state.start === t ? ' selected' : ''), esc(t));
+    const pk = (hotel && hotel.toSalonMin != null) ? subtractMinutes(t, hotel.toSalonMin) : null;
+    const label = '<span class="time-main">' + esc(t) + '</span>'
+      + (pk ? '<span class="pickup-sub">pickup ' + esc(pk) + '</span>' : '');
+    const b = el('button', 'choice time' + (state.start === t ? ' selected' : ''), label);
     b.type = 'button';
     b.onclick = () => { state.start = t; renderDetails(); renderSummary(); };
     tw.appendChild(b);
@@ -197,13 +202,10 @@ function renderAlgueblueDetails(sec) {
   if (!starts.length) tw.appendChild(el('p', 'muted', 'No open start times for this hotel. Please try another pickup hotel.'));
   sec.appendChild(tw);
 
-  // 開始を選んだら、お迎え時刻の目安を表示（= 開始 − ホテル→アルグブルーの所要）
-  if (state.start) {
-    const hotel = (ab.pickupHotels || []).find((x) => x.name === state.pickup);
-    if (hotel && hotel.toSalonMin != null) {
-      const pk = subtractMinutes(state.start, hotel.toSalonMin);
-      sec.appendChild(el('p', 'muted small', 'Estimated hotel pickup around ' + esc(pk) + '. We will confirm the exact time by email.'));
-    }
+  // 選択後の確認（施術開始とお迎え時刻を明示）
+  if (state.start && hotel && hotel.toSalonMin != null) {
+    const pk = subtractMinutes(state.start, hotel.toSalonMin);
+    sec.appendChild(el('p', 'muted small', 'Treatment starts ' + esc(state.start) + ' · hotel pickup around ' + esc(pk) + ' (we will confirm by email).'));
   }
 }
 
@@ -261,8 +263,12 @@ function renderSummary() {
     const p = state.availability[state.date].algueblue.plans[state.plan];
     lines.push(['Plan', p.name + (state.option ? ' (' + state.option + ')' : '')]);
   }
-  if (state.start) lines.push(['Start', state.start]);
-  if (activityKind() === 'algueblue' && state.pickup) lines.push(['Pickup', state.pickup]);
+  if (state.start) lines.push([activityKind() === 'algueblue' ? 'Treatment start' : 'Start', state.start]);
+  if (activityKind() === 'algueblue' && state.pickup) {
+    lines.push(['Pickup hotel', state.pickup]);
+    const hotel = (state.availability[state.date].algueblue.pickupHotels || []).find((x) => x.name === state.pickup);
+    if (hotel && hotel.toSalonMin != null && state.start) lines.push(['Pickup time', subtractMinutes(state.start, hotel.toSalonMin)]);
+  }
   lines.push(['People', state.people]);
   if (activityRequiresHeight() && state.height) lines.push(['Height (cm)', state.height]);
   $('#summary').innerHTML = lines.map(([k, v]) => '<div class="sum-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('');
