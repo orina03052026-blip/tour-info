@@ -32,6 +32,15 @@ function fmtDateLabel(dateStr, idx) {
   return (rel ? rel + ' · ' : '') + months[m - 1] + ' ' + d;
 }
 
+// "HH:mm" から min 分を引いた "HH:mm"（お迎え時刻の目安表示に使用）
+function subtractMinutes(hhmm, min) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  let total = h * 60 + m - Number(min);
+  if (total < 0) total = 0;
+  const hh = Math.floor(total / 60), mm = total % 60;
+  return ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2);
+}
+
 async function init() {
   // 今日・明日ページのカードから activity / date を引き継いで事前選択（日付の選び直しを省く）
   const qs = new URLSearchParams(location.search);
@@ -139,7 +148,7 @@ function renderAlgueblueDetails(sec) {
     const b = el('button', 'choice plan' + (state.plan === key ? ' selected' : ''),
       '<strong>' + esc(p.name) + '</strong><span class="muted">¥' + Number(p.price).toLocaleString() + '</span>');
     b.type = 'button';
-    b.onclick = () => { Object.assign(state, { plan: key, option: null, start: null }); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { plan: key, option: null, pickup: null, start: null }); renderDetails(); renderSummary(); };
     planWrap.appendChild(b);
   });
   if (!planWrap.children.length) planWrap.appendChild(el('p', 'muted', 'No plan available on this date.'));
@@ -159,29 +168,43 @@ function renderAlgueblueDetails(sec) {
     sec.appendChild(ow);
   }
 
+  // 送迎ホテルを先に選ぶ（ホテルで送迎時間が違い、取れる開始時刻も変わるため）
+  const startsByHotel = plan.startsByHotel || {};
+  sec.appendChild(el('h3', 'step-title', 'Pickup hotel'));
+  const hw = el('div', 'choices');
+  (ab.pickupHotels || []).forEach((h) => {
+    const openForHotel = (startsByHotel[h.name] || []).length > 0;
+    const b = el('button', 'choice' + (state.pickup === h.name ? ' selected' : '') + (openForHotel ? '' : ' disabled'), esc(h.name));
+    b.type = 'button';
+    b.disabled = !openForHotel;
+    b.onclick = () => { Object.assign(state, { pickup: h.name, start: null }); renderDetails(); renderSummary(); };
+    hw.appendChild(b);
+  });
+  sec.appendChild(hw);
+  sec.appendChild(el('p', 'muted small', 'Our staff will pick you up at your hotel. The start times below already include travel to Algueblue.'));
+  if (!state.pickup) return;
+
+  // 選んだホテルで取れる開始時刻だけを表示
+  const starts = startsByHotel[state.pickup] || [];
   sec.appendChild(el('h3', 'step-title', 'Start time'));
   const tw = el('div', 'choices times');
-  (plan.starts || []).forEach((t) => {
+  starts.forEach((t) => {
     const b = el('button', 'choice time' + (state.start === t ? ' selected' : ''), esc(t));
     b.type = 'button';
     b.onclick = () => { state.start = t; renderDetails(); renderSummary(); };
     tw.appendChild(b);
   });
-  if (!(plan.starts || []).length) tw.appendChild(el('p', 'muted', 'No open start times.'));
+  if (!starts.length) tw.appendChild(el('p', 'muted', 'No open start times for this hotel. Please try another pickup hotel.'));
   sec.appendChild(tw);
-  if (!state.start) return;
 
-  // 送迎ホテルの選択（必須）
-  sec.appendChild(el('h3', 'step-title', 'Pickup hotel'));
-  const hw = el('div', 'choices');
-  (ab.pickupHotels || []).forEach((h) => {
-    const b = el('button', 'choice' + (state.pickup === h ? ' selected' : ''), esc(h));
-    b.type = 'button';
-    b.onclick = () => { state.pickup = h; renderDetails(); renderSummary(); };
-    hw.appendChild(b);
-  });
-  sec.appendChild(hw);
-  sec.appendChild(el('p', 'muted small', 'Our staff will pick you up here. We will confirm the pickup time by email.'));
+  // 開始を選んだら、お迎え時刻の目安を表示（= 開始 − ホテル→アルグブルーの所要）
+  if (state.start) {
+    const hotel = (ab.pickupHotels || []).find((x) => x.name === state.pickup);
+    if (hotel && hotel.toSalonMin != null) {
+      const pk = subtractMinutes(state.start, hotel.toSalonMin);
+      sec.appendChild(el('p', 'muted small', 'Estimated hotel pickup around ' + esc(pk) + '. We will confirm the exact time by email.'));
+    }
+  }
 }
 
 function renderTourDetails(sec) {
