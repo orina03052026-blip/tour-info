@@ -318,9 +318,9 @@ function showDone(data) {
   $('#done').hidden = false;
   $('#done').innerHTML =
     '<div class="done-check">✓</div>' +
-    '<h2>Booking confirmed</h2>' +
-    '<p>Your booking ID is <b>' + esc(data.bookingId) + '</b>.</p>' +
-    '<p class="muted">We look forward to seeing you. Payment is made on site.</p>';
+    '<h2>Booking request received</h2>' +
+    '<p>Your reference is <b>' + esc(data.bookingId) + '</b>.</p>' +
+    '<p class="muted">We are holding your slot and will confirm by email shortly. Payment is made on site.</p>';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
