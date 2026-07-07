@@ -17,8 +17,12 @@ const MAINTENANCE_MSG =
   + '<p class="muted">Algueblue online booking is temporarily paused. Please try again a little later.</p>'
   + '<p class="muted small">お急ぎの場合 / Urgent: WhatsApp +81 70-2013-1181 ・ comecomehimeji@gmail.com</p>';
 
+// プレビュー用バイパス：?preview=algueblue2026 付きURLの時だけメンテナンスを無視（本人確認用）。
+//   一般のお客様には引き続きメンテ表示。公開時はこの合言葉付きURLを共有しなければよい。
+function maintenanceBypassed() { return new URLSearchParams(location.search).get('preview') === 'algueblue2026'; }
+
 // 選択中のアクティビティが停止対象か
-function activityUnderMaintenance() { return MAINTENANCE && MAINTENANCE_KINDS.indexOf(activityKind()) !== -1; }
+function activityUnderMaintenance() { return MAINTENANCE && !maintenanceBypassed() && MAINTENANCE_KINDS.indexOf(activityKind()) !== -1; }
 
 const ACTIVITIES = [
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue' },
