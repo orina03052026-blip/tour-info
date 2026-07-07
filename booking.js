@@ -447,6 +447,23 @@ function renderSummary() {
   }
   lines.push([bi('人数', 'People'), state.people]);
   if (activityRequiresHeight() && state.height) lines.push(['Height (cm)', state.height]);
+  // 料金表示（ツアー）。バックエンドが availability で返す pricePerPerson / soloPrice から算出。
+  //   計算式は確認メール(booking_webapp.gs)と同じ：1名は単独料金、2名以上は人数×単価。
+  //   料金の出所は GAS の BOOKING_CONFIG.tours（フロントには持たない＝二重管理を避ける）。
+  if (activityKind() === 'tour' && state.date) {
+    const tour = state.availability[state.date].tours[state.activity];
+    if (tour && tour.pricePerPerson) {
+      const ppl = Number(state.people) || 1;
+      let total, note;
+      if (ppl === 1 && tour.soloPrice) {
+        total = tour.soloPrice; note = bi('1名', '1 person');
+      } else {
+        total = tour.pricePerPerson * ppl;
+        note = '¥' + Number(tour.pricePerPerson).toLocaleString() + bi('／人', '/person') + ' × ' + ppl;
+      }
+      lines.push([bi('料金', 'Price'), '¥' + Number(total).toLocaleString() + ' (' + note + ')']);
+    }
+  }
   $('#summary').innerHTML = lines.map(([k, v]) => '<div class="sum-row"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>').join('');
   $('#submit-btn').disabled = !ready;
 }
