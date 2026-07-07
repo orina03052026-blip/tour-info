@@ -9,19 +9,13 @@ const HORIZON_DAYS = 30;
 // ▼メンテナンス用スイッチ。true の間は「停止対象アクティビティ」だけ申込を止め、案内を表示する。
 //   ツアー等は通常どおり受付。作業が終わったら false に戻して push すれば通常運用に復帰する。
 const MAINTENANCE = true;
-// 停止対象（activityKind の値）。※GAS本番デプロイ作業中は共通バックエンド更新のため全停止（'algueblue','tour'）。
-//   作業完了・検証後に ['algueblue'] へ戻す（アルグブルーのみ停止に）。最終公開時は MAINTENANCE=false。
-const MAINTENANCE_KINDS = ['algueblue', 'tour'];
+// 停止対象（activityKind の値）。今回はアルグブルーのみ停止。
+const MAINTENANCE_KINDS = ['algueblue'];
 const MAINTENANCE_MSG =
-  '<h3>予約システムメンテナンス中 / Booking temporarily unavailable</h3>'
-  + '<p>ただいまオンライン予約システムのメンテナンスを行っています。まもなく再開します。ご不便をおかけして申し訳ありません。</p>'
-  + '<p class="muted">Our online booking system is under brief maintenance and will be back shortly. Sorry for the inconvenience.</p>'
+  '<h3>アルグブルーはただいま予約調整中です</h3>'
+  + '<p>アルグブルーのオンライン予約を一時的に停止しています。ご不便をおかけしますが、少し時間をおいて再度お試しください。</p>'
+  + '<p class="muted">Algueblue online booking is temporarily paused. Please try again a little later.</p>'
   + '<p class="muted small">お急ぎの場合 / Urgent: WhatsApp +81 70-2013-1181 ・ comecomehimeji@gmail.com</p>';
-// ▼作業後に復元する元のアルグブルー専用文言（['algueblue'] に戻す際にこちらへ差し替え）：
-//   '<h3>アルグブルーはただいま予約調整中です</h3>'
-//   + '<p>アルグブルーのオンライン予約を一時的に停止しています。ご不便をおかけしますが、少し時間をおいて再度お試しください。</p>'
-//   + '<p class="muted">Algueblue online booking is temporarily paused. Please try again a little later.</p>'
-//   + '<p class="muted small">お急ぎの場合 / Urgent: WhatsApp +81 70-2013-1181 ・ comecomehimeji@gmail.com</p>'
 
 // 選択中のアクティビティが停止対象か
 function activityUnderMaintenance() { return MAINTENANCE && MAINTENANCE_KINDS.indexOf(activityKind()) !== -1; }
