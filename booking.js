@@ -8,7 +8,7 @@ const HORIZON_DAYS = 30;
 
 // ▼メンテナンス用スイッチ。true の間は「停止対象アクティビティ」だけ申込を止め、案内を表示する。
 //   ツアー等は通常どおり受付。作業が終わったら false に戻して push すれば通常運用に復帰する。
-const MAINTENANCE = true;
+const MAINTENANCE = false;
 // 停止対象（activityKind の値）。今回はアルグブルーのみ停止。
 const MAINTENANCE_KINDS = ['algueblue'];
 const MAINTENANCE_MSG =
