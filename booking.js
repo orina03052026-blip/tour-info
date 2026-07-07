@@ -497,7 +497,10 @@ function showDone(data) {
   const heading = alg ? 'ご予約を受け付けました / Booking request received' : 'Booking request received';
   const refLine = (alg ? '予約番号 / Your reference: ' : 'Your reference is ') + '<b>' + esc(data.bookingId) + '</b>.';
   const note = alg
-    ? '枠をお取りしています。まもなくメールで確定のご連絡をします。お支払いは当日現地払いです。<br>We are holding your slot and will confirm by email shortly. Payment is made on site.'
+    ? '枠をお取りしています。<strong>まもなくメールで確定のご連絡をします。</strong>お支払いは当日現地払いです。'
+      + '<br>確定メールが万が一届かない場合は <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
+      + '<br>We are holding your slot and will confirm by email shortly. Payment is made on site.'
+      + '<br>If you don\'t receive the confirmation email, please contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.'
     : 'We are holding your slot and will confirm by email shortly. Payment is made on site.';
   $('#done').innerHTML =
     '<div class="done-check">✓</div>' +
