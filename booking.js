@@ -72,6 +72,12 @@ function bookingTotalYen() {
   return (ppl === 1 && tour.soloPrice) ? tour.soloPrice : tour.pricePerPerson * ppl;
 }
 
+// 予約日が「当日（今日）」か。バックエンド由来の state.dates[0]（今日, JST基準）と比較するので端末TZに依存しない。
+// 当日のみ現地払いも可（時間が無く、PayPal未登録／請求書送付が間に合わないケースの救済）。
+function isSameDay() {
+  return !!(state.date && state.dates && state.dates.length && state.date === state.dates[0]);
+}
+
 // 共有の静的テキスト（日付選択・Summary・確定ボタン等）を、選択中アクティビティに合わせて切替。
 function updateChrome() {
   const alg = isAlg();
@@ -82,9 +88,15 @@ function updateChrome() {
   const btn = $('#submit-btn');
   if (btn) btn.textContent = alg ? '予約する / Confirm booking' : 'Confirm booking';
   const pay = document.querySelector('#summary-section .muted.small');
-  if (pay) pay.textContent = alg
-    ? 'ご確定後、次の画面でPayPalにてお支払いいただけます。ご入金の確認をもってご予約完了となります。 / After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.'
-    : 'After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.';
+  if (pay) {
+    let t = alg
+      ? 'ご確定後、次の画面でPayPalにてお支払いいただけます。ご入金の確認をもってご予約完了となります。 / After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.'
+      : 'After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.';
+    if (isSameDay()) t += alg
+      ? '　当日のご予約に限り、当日現地でのお支払いも可能です。 / For same-day bookings, you may also pay on site.'
+      : ' For same-day bookings, you may also pay on site.';
+    pay.textContent = t;
+  }
   const priv = $('#privacy-note');
   if (priv) priv.textContent = alg
     ? 'ご入力の個人情報（お名前・ご連絡先など）は、ご予約の受付・確認のご連絡にのみ使用し、法令に基づく場合を除き第三者へ提供しません。データはGoogleのサービス上に安全に保管します。お問い合わせ：comecomehimeji@gmail.com（株式会社あくと） / The personal information you provide is used only to process and confirm your booking; we do not share it with third parties except as required by law. Data is stored securely on Google. Contact: comecomehimeji@gmail.com (ACT Co., Ltd.).'
@@ -553,6 +565,14 @@ function showDone(data) {
       + '<br>No PayPal account? You can also pay by credit or debit card. Just email us and we will send you a card payment page.'
       + '<br>Questions? Contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.';
 
+  // 当日（今日）のご予約に限り現地払いも可（時間が無く、PayPal未登録／請求書送付が間に合わない場合の救済）。
+  const sameDayNote = isSameDay()
+    ? (alg
+        ? '<br><br><strong>当日のご予約に限り、当日現地でのお支払いも可能です。</strong>'
+          + '<br>For same-day bookings, you may also pay on site.'
+        : '<br><br>For same-day bookings, you may also pay on site.')
+    : '';
+
   // 金額が取れなかった場合の保険：ボタンを出さず、リンクを別途お送りする案内にする。
   const fallbackNote = alg
     ? '<strong>お支払い用のPayPalリンクをメールでお送りします。</strong>ご入金の確認をもってご予約完了となります。'
@@ -564,8 +584,8 @@ function showDone(data) {
     '<h2>' + heading + '</h2>' +
     '<p>' + refLine + '</p>' +
     (payBlock
-      ? '<p class="muted">' + note + '</p>' + payBlock
-      : '<p class="muted">' + fallbackNote + '</p>');
+      ? '<p class="muted">' + note + sameDayNote + '</p>' + payBlock
+      : '<p class="muted">' + fallbackNote + sameDayNote + '</p>');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
