@@ -544,10 +544,13 @@ function showDone(data) {
 
   const note = alg
     ? '下の「PayPalでお支払い」ボタンからお支払いください。<strong>ご入金を確認しましたら、ご予約完了のご連絡をメールでお送りします。</strong>'
-      + '<br>ご不明な点は <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
-      + '<br>Please pay with the PayPal button below. Once we receive your payment, we will email you to confirm your booking.'
+      + '<br><br>PayPalをお持ちでない方は、クレジットカードでもお支払いいただけます。カード払いをご希望の場合は、下記メールアドレスへご連絡ください。カード用のお支払いページをお送りします。'
+      + '<br>ご不明な点も <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
+      + '<br><br>Please pay with the PayPal button below. Once we receive your payment, we will email you to confirm your booking.'
+      + '<br>No PayPal account? You can also pay by credit or debit card. Just email us and we will send you a card payment page.'
       + '<br>Questions? Contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.'
     : 'Please pay with the PayPal button below. Once we receive your payment, we will email you to confirm your booking.'
+      + '<br>No PayPal account? You can also pay by credit or debit card. Just email us and we will send you a card payment page.'
       + '<br>Questions? Contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.';
 
   // 金額が取れなかった場合の保険：ボタンを出さず、リンクを別途お送りする案内にする。
