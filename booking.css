@@ -115,6 +115,22 @@ body {
 .done h2 { color: #1f3a4a; margin-bottom: 8px; }
 .done p { margin: 4px 0; }
 
+/* PayPal お支払いボタン（完了画面） */
+.pay-btn {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 15px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(135deg, #0070ba, #003087);
+  box-shadow: 0 6px 14px rgba(0, 112, 186, 0.35);
+}
+.pay-btn:hover { filter: brightness(1.06); }
+
 /* ---- アルグブルー用 月カレンダー ---- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .cal-title { font-size: 1rem; font-weight: 700; color: #1f3a4a; }

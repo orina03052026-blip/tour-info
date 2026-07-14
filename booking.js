@@ -53,12 +53,23 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const isAlg = () => activityKind() === 'algueblue';
 const bi = (ja, en) => isAlg() ? (ja + ' / ' + en) : en;
 
-// 予約日が「3日目以降（＝翌々日以降）」か。今日・翌日はバックエンド由来の state.dates（今日・明日, JST基準）で判定するので、
-// お客様の端末のタイムゾーンに左右されない。ISO 'YYYY-MM-DD' は文字列比較でそのまま日付順になる。
-function isAdvanceDate() {
-  if (!state.date || !state.dates || !state.dates.length) return false;
-  const tomorrow = state.dates[1] || state.dates[0];
-  return state.date > tomorrow;
+// PayPal.Me 受取リンク（末尾に金額を付けて使う。例 .../44000JPY）。会社アカウント @himejiact。
+const PAYPAL_ME = 'https://paypal.me/himejiact/';
+
+// この予約の合計金額（円）。バックエンド(booking_webapp.gs)と同じ計算式にする：
+//   アルグブルー＝プラン単価×人数（soloPriceなし）／ツアー＝1名はsoloPrice・2名以上は単価×人数。
+function bookingTotalYen() {
+  if (!state.date || !state.availability || !state.availability[state.date]) return null;
+  const day = state.availability[state.date];
+  const ppl = Math.max(1, Number(state.people) || 1);
+  if (activityKind() === 'algueblue') {
+    const plan = day.algueblue && day.algueblue.plans && day.algueblue.plans[state.plan];
+    if (!plan || plan.price == null) return null;
+    return plan.price * ppl;
+  }
+  const tour = day.tours && day.tours[state.activity];
+  if (!tour || tour.pricePerPerson == null) return null;
+  return (ppl === 1 && tour.soloPrice) ? tour.soloPrice : tour.pricePerPerson * ppl;
 }
 
 // 共有の静的テキスト（日付選択・Summary・確定ボタン等）を、選択中アクティビティに合わせて切替。
@@ -71,15 +82,9 @@ function updateChrome() {
   const btn = $('#submit-btn');
   if (btn) btn.textContent = alg ? '予約する / Confirm booking' : 'Confirm booking';
   const pay = document.querySelector('#summary-section .muted.small');
-  if (pay) {
-    const advance = isAdvanceDate(); // 翌々日以降のご予約は事前オンライン決済のご案内に切替
-    if (alg) pay.textContent = advance
-      ? 'お支払い用のサイトをお送りいたします。お支払い完了を確認しましたらご予約完了となります。 / We will email you a payment link — your booking is confirmed once your payment is received.'
-      : '今のお支払いはありません（当日現地払い）。 / No payment is taken now — you pay on site.';
-    else pay.textContent = advance
-      ? 'We will email you a payment link — your booking is confirmed once your payment is received.'
-      : 'No payment is taken now — you pay on site.';
-  }
+  if (pay) pay.textContent = alg
+    ? 'ご確定後、次の画面でPayPalにてお支払いいただけます。ご入金の確認をもってご予約完了となります。 / After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.'
+    : 'After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.';
   const priv = $('#privacy-note');
   if (priv) priv.textContent = alg
     ? 'ご入力の個人情報（お名前・ご連絡先など）は、ご予約の受付・確認のご連絡にのみ使用し、法令に基づく場合を除き第三者へ提供しません。データはGoogleのサービス上に安全に保管します。お問い合わせ：comecomehimeji@gmail.com（株式会社あくと） / The personal information you provide is used only to process and confirm your booking; we do not share it with third parties except as required by law. Data is stored securely on Google. Contact: comecomehimeji@gmail.com (ACT Co., Ltd.).'
@@ -525,27 +530,39 @@ function showDone(data) {
   $('#form-body').hidden = true;
   $('#done').hidden = false;
   const alg = isAlg();
-  const heading = alg ? 'ご予約を受け付けました / Booking request received' : 'Booking request received';
+  const heading = alg ? 'ご予約を受け付けました / Booking received' : 'Booking received';
   const refLine = (alg ? '予約番号 / Your reference: ' : 'Your reference is ') + '<b>' + esc(data.bookingId) + '</b>.';
-  const advance = isAdvanceDate(); // 翌々日以降は事前オンライン決済の案内に切替（Summaryの表示と揃える）
+
+  // お支払い金額（バックエンドから返れば優先、なければフロントで計算）。
+  const amount = (data && Number(data.amount)) ? Number(data.amount) : bookingTotalYen();
+  let payBlock = '';
+  if (amount) {
+    const label = (alg ? 'PayPalでお支払い / Pay with PayPal ' : 'Pay with PayPal ') + '¥' + amount.toLocaleString();
+    payBlock =
+      '<a class="pay-btn" href="' + PAYPAL_ME + amount + 'JPY" target="_blank" rel="noopener noreferrer">' + esc(label) + '</a>';
+  }
+
   const note = alg
-    ? (advance
-        ? '枠をお取りしています。<strong>まもなくお支払い用のサイトをメールでお送りします。</strong>お支払いの確認をもってご予約完了となります。'
-          + '<br>メールが万が一届かない場合は <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
-          + '<br>We are holding your slot and will email you a payment link shortly. Your booking is confirmed once your payment is received.'
-          + '<br>If you don\'t receive the email, please contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.'
-        : '枠をお取りしています。<strong>まもなくメールで確定のご連絡をします。</strong>お支払いは当日現地払いです。'
-          + '<br>確定メールが万が一届かない場合は <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
-          + '<br>We are holding your slot and will confirm by email shortly. Payment is made on site.'
-          + '<br>If you don\'t receive the confirmation email, please contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.')
-    : (advance
-        ? 'We are holding your slot and will email you a payment link shortly. Your booking is confirmed once your payment is received.'
-        : 'We are holding your slot and will confirm by email shortly. Payment is made on site.');
+    ? '下の「PayPalでお支払い」ボタンからお支払いください。<strong>ご入金を確認しましたら、ご予約完了のご連絡をメールでお送りします。</strong>'
+      + '<br>ご不明な点は <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a> までご連絡ください。'
+      + '<br>Please pay with the PayPal button below. Once we receive your payment, we will email you to confirm your booking.'
+      + '<br>Questions? Contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.'
+    : 'Please pay with the PayPal button below. Once we receive your payment, we will email you to confirm your booking.'
+      + '<br>Questions? Contact <a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.';
+
+  // 金額が取れなかった場合の保険：ボタンを出さず、リンクを別途お送りする案内にする。
+  const fallbackNote = alg
+    ? '<strong>お支払い用のPayPalリンクをメールでお送りします。</strong>ご入金の確認をもってご予約完了となります。'
+      + '<br>We will email you a PayPal payment link. Your booking is complete once we receive your payment.'
+    : 'We will email you a PayPal payment link. Your booking is complete once we receive your payment.';
+
   $('#done').innerHTML =
     '<div class="done-check">✓</div>' +
     '<h2>' + heading + '</h2>' +
     '<p>' + refLine + '</p>' +
-    '<p class="muted">' + note + '</p>';
+    (payBlock
+      ? '<p class="muted">' + note + '</p>' + payBlock
+      : '<p class="muted">' + fallbackNote + '</p>');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
