@@ -432,8 +432,13 @@ function renderTourDetails(sec) {
 function renderPeople(sec) {
   sec.appendChild(el('h3', 'step-title', bi('人数', 'Number of people')));
   const row = el('div', 'people-row');
-  const input = el('input'); input.type = 'number'; input.min = '1'; input.max = '20'; input.value = state.people;
-  input.oninput = () => { state.people = Math.max(1, Number(input.value) || 1); renderSummary(); };
+  // アルグブルーは個室のため2名まで。ツアーは従来どおり。
+  const maxPeople = isAlg() ? 2 : 20;
+  if (state.people > maxPeople) state.people = maxPeople;
+  const input = el('input'); input.type = 'number'; input.min = '1'; input.max = String(maxPeople); input.value = state.people;
+  // max属性だけだと手入力で超過できるため、状態も上限で丸める。
+  input.oninput = () => { state.people = Math.min(maxPeople, Math.max(1, Number(input.value) || 1)); renderSummary(); };
+  input.onchange = () => { input.value = state.people; }; // 確定時に見た目も上限へ揃える
   row.appendChild(input);
   sec.appendChild(row);
 }
