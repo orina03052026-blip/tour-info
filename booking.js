@@ -25,10 +25,11 @@ function maintenanceBypassed() { return new URLSearchParams(location.search).get
 function activityUnderMaintenance() { return MAINTENANCE && !maintenanceBypassed() && MAINTENANCE_KINDS.indexOf(activityKind()) !== -1; }
 
 const ACTIVITIES = [
-  { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue' },
-  { code: 'ebike-castle', label: 'e-bike Ride around the Castle',    kind: 'tour' },
-  { code: 'ebike-sea',    label: 'e-bike Ride to the Sea',          kind: 'tour' },
-  { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour' },
+  // maxPeople: 予約フォームで選べる人数の上限（アルグブルーは個室のため2名）。
+  { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue', maxPeople: 2 },
+  { code: 'ebike-castle', label: 'e-bike Ride around the Castle',    kind: 'tour', maxPeople: 4 },
+  { code: 'ebike-sea',    label: 'e-bike Ride to the Sea',          kind: 'tour', maxPeople: 4 },
+  { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour', maxPeople: 8 },
 ];
 
 const state = {
@@ -178,6 +179,8 @@ function renderActivities() {
 }
 
 function activityKind() { const a = ACTIVITIES.find((x) => x.code === state.activity); return a ? a.kind : null; }
+// 選択中アクティビティの人数上限（未定義なら従来どおり20）。
+function activityMaxPeople() { const a = ACTIVITIES.find((x) => x.code === state.activity); return (a && a.maxPeople) || 20; }
 
 /* ---- Step 2: date ---- */
 function renderDates() {
@@ -432,8 +435,8 @@ function renderTourDetails(sec) {
 function renderPeople(sec) {
   sec.appendChild(el('h3', 'step-title', bi('人数', 'Number of people')));
   const row = el('div', 'people-row');
-  // アルグブルーは個室のため2名まで。ツアーは従来どおり。
-  const maxPeople = isAlg() ? 2 : 20;
+  // アクティビティごとの人数上限（アルグブルー2／e-bike各4／姫路城ガイド8）。
+  const maxPeople = activityMaxPeople();
   if (state.people > maxPeople) state.people = maxPeople;
   const input = el('input'); input.type = 'number'; input.min = '1'; input.max = String(maxPeople); input.value = state.people;
   // max属性だけだと手入力で超過できるため、状態も上限で丸める。
