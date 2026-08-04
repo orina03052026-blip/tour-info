@@ -166,6 +166,13 @@ body {
 }
 .cal-cell.selected.today::after { background: #fff; }
 
+/* ---- ツアー用「See more dates」トグル（アルグブルー以外のカレンダー展開） ---- */
+.link-toggle {
+  background: none; border: none; color: #009efd; font-size: 0.85rem;
+  cursor: pointer; padding: 6px 2px; text-decoration: underline;
+}
+.tour-calendar { margin-top: 10px; width: 100%; }
+
 /* ---- メンテナンス案内 ---- */
 .maint-notice { text-align: center; padding: 20px 8px; }
 .maint-notice h3 { font-size: 1.15rem; color: #1f3a4a; margin-bottom: 10px; }

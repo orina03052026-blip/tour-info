@@ -40,7 +40,9 @@ const state = {
   availability: null,   // 日付キャッシュ { 'YYYY-MM-DD': { algueblue, tours } }（初期は今日・明日。先の日はクリック時に単日追加）
   dates: [],            // ツアー用の日付（today, tomorrow）
   openDays: [],         // アルグブルーの予約候補日（出勤予定あり＆休業でない日）'YYYY-MM-DD' の配列
-  calMonth: null,       // アルグブルーのカレンダーで表示中の月 {y, m(0-11)}
+  tourOpenDays: {},     // ツアー用の予約候補日キャッシュ { activityCode: ['YYYY-MM-DD', ...] }（「See more dates」で取得）
+  showTourCalendar: false, // ツアーで「See more dates」を開いているか
+  calMonth: null,       // カレンダー（アルグブルー・ツアー共通）で表示中の月 {y, m(0-11)}
   presetPlan: null,     // ?plan= で来たプラン（WPのプランボタンから）
   activity: null,
   date: null,
@@ -177,7 +179,7 @@ function renderActivities() {
   ACTIVITIES.forEach((a) => {
     const b = el('button', 'choice' + (state.activity === a.code ? ' selected' : ''), esc(a.label));
     b.type = 'button';
-    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, pickup: null, height: '' }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
+    b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, pickup: null, height: '', showTourCalendar: false, calMonth: null }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
 }
@@ -203,8 +205,14 @@ function renderDates() {
     $('#summary-section').hidden = true;
     return;
   }
-  // アルグブルーは「先の予約」対応の月カレンダー。ツアーは従来どおり今日・明日の2択。
+  // アルグブルーは「先の予約」対応の月カレンダー。ツアーは今日・明日をすぐ選べるボタン＋「See more dates」で同じカレンダーを展開。
   if (activityKind() === 'algueblue') { renderAlgueblueCalendar(wrap); return; }
+  renderTourDates(wrap);
+}
+
+// ツアー（e-bike／城ガイド／午後工芸ツアー）の日付選択：今日・明日はボタンで即選択、
+// それより先は「See more dates」を押すとアルグブルーと同じ月カレンダーが展開される。
+function renderTourDates(wrap) {
   state.dates.forEach((d, idx) => {
     const open = isDateOpen(d);
     const b = el('button', 'choice' + (state.date === d ? ' selected' : '') + (open ? '' : ' disabled'), fmtDateLabel(d, idx));
@@ -213,6 +221,17 @@ function renderDates() {
     b.onclick = () => { Object.assign(state, { date: d, plan: null, option: null, start: null, pickup: null }); renderDates(); renderDetails(); renderSummary(); };
     wrap.appendChild(b);
   });
+
+  const toggle = el('button', 'link-toggle', state.showTourCalendar ? 'Hide calendar' : 'See more dates ›');
+  toggle.type = 'button';
+  toggle.onclick = () => { state.showTourCalendar = !state.showTourCalendar; renderDates(); };
+  wrap.appendChild(toggle);
+
+  if (state.showTourCalendar) {
+    const calWrap = el('div', 'tour-calendar');
+    wrap.appendChild(calWrap);
+    renderTourCalendar(calWrap);
+  }
 }
 
 /* ---- アルグブルー用 月カレンダー（今日〜HORIZON_DAYS日先） ---- */
@@ -232,7 +251,8 @@ function isAlgueblueDayOpen(ds) {
   return true;
 }
 
-function renderAlgueblueCalendar(wrap) {
+// 月カレンダーの共通描画（アルグブルー・ツアー兼用）。isOpenFn(ds)で開いている日を判定し、onSelect(ds)で選択する。
+function renderCalendarGrid(wrap, isOpenFn, onSelect) {
   const today = todayYmd();
   const endYmd = addDaysYmd(today, HORIZON_DAYS - 1);
   const todayD = ymdToDate(today), endD = ymdToDate(endYmd);
@@ -263,21 +283,76 @@ function renderAlgueblueCalendar(wrap) {
   for (let dnum = 1; dnum <= daysInMonth; dnum++) {
     const ds = dateToYmd(new Date(y, m, dnum));
     const inRange = ds >= today && ds <= endYmd;
-    const open = inRange && isAlgueblueDayOpen(ds);
+    const open = inRange && isOpenFn(ds);
     const cls = 'cal-cell' + (inRange ? (open ? ' open' : ' closed') : ' out')
       + (state.date === ds ? ' selected' : '') + (ds === today ? ' today' : '');
     const cell = el('button', cls, String(dnum));
     cell.type = 'button';
     cell.disabled = !open;
-    if (open) cell.onclick = () => selectAlgueblueDate(ds);
+    if (open) cell.onclick = () => onSelect(ds);
     grid.appendChild(cell);
   }
   wrap.appendChild(grid);
+}
 
+function renderAlgueblueCalendar(wrap) {
+  renderCalendarGrid(wrap, isAlgueblueDayOpen, selectAlgueblueDate);
   if (!(state.openDays || []).length) {
     wrap.appendChild(el('p', 'muted small',
       '現在ご予約いただける日がありません。カレンダーにスタッフの出勤予定が入り次第、ここに表示されます。 / No open dates yet — dates appear once staff shifts are added to the calendar.'));
   }
+}
+
+// ツアー用「See more dates」カレンダー。選択中アクティビティの候補日を初回だけ取得してキャッシュする。
+function isTourDayOpen(ds) {
+  const days = state.tourOpenDays[state.activity] || [];
+  if (days.indexOf(ds) === -1) return false;
+  const cached = state.availability[ds];
+  if (cached && cached.tours && cached.tours[state.activity] && cached.tours[state.activity].open === false) return false;
+  return true;
+}
+
+function renderTourCalendar(wrap) {
+  const code = state.activity;
+  if (!state.tourOpenDays[code]) {
+    wrap.appendChild(el('p', 'muted small', 'Loading available dates…'));
+    fetch(WEBAPP_URL + '?action=tourOpenDays&activity=' + encodeURIComponent(code) + '&days=' + HORIZON_DAYS, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { state.tourOpenDays[code] = (d && d.ok && d.openDays) || []; if (state.activity === code) renderDates(); })
+      .catch(() => { state.tourOpenDays[code] = []; if (state.activity === code) renderDates(); });
+    return;
+  }
+  renderCalendarGrid(wrap, isTourDayOpen, selectTourDate);
+  if (!(state.tourOpenDays[code] || []).length) {
+    wrap.appendChild(el('p', 'muted small', 'No open dates in the next ' + HORIZON_DAYS + ' days.'));
+  }
+}
+
+// カレンダーでツアーの日付を選択。未取得なら単日の空きを取得してから詳細を描画（selectAlgueblueDateと同じ形）。
+async function selectTourDate(ds) {
+  Object.assign(state, { date: ds, plan: null, option: null, start: null, pickup: null });
+  renderDates();
+  if (!state.availability[ds]) {
+    const sec = $('#details-section');
+    sec.hidden = false;
+    sec.innerHTML = '';
+    sec.appendChild(el('p', 'muted', 'Checking availability…'));
+    try {
+      const res = await fetch(WEBAPP_URL + '?action=availability&date=' + ds, { cache: 'no-store' });
+      const data = await res.json();
+      if (!(data.ok && data.days && data.days[ds])) throw new Error(data.error || 'load failed');
+      state.availability[ds] = data.days[ds];
+    } catch (err) {
+      const sec2 = $('#details-section');
+      sec2.innerHTML = '';
+      sec2.appendChild(el('p', 'muted', 'Could not load availability. Please try again.'));
+      console.error(err);
+      return;
+    }
+    renderDates();
+  }
+  renderDetails();
+  renderSummary();
 }
 
 // カレンダーで日付を選択。未取得なら単日の空きを取得してから詳細を描画。
