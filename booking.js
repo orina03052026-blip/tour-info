@@ -26,10 +26,14 @@ function activityUnderMaintenance() { return MAINTENANCE && !maintenanceBypassed
 
 const ACTIVITIES = [
   // maxPeople: 予約フォームで選べる人数の上限（アルグブルーは個室のため2名）。
+  // minPeople: 予約フォームで選べる人数の下限（未指定は1）。午後工芸ツアーはガイド1名が最大6名を引率する少人数制のため最少2名。
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue', maxPeople: 2 },
   { code: 'ebike-castle', label: 'e-bike Ride around the Castle',    kind: 'tour', maxPeople: 4 },
   { code: 'ebike-sea',    label: 'e-bike Ride to the Sea',          kind: 'tour', maxPeople: 4 },
   { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour', maxPeople: 8 },
+  { code: 'craft-course1', label: 'Afternoon Craft Tour — Calligraphy + Wagashi Making', kind: 'tour', maxPeople: 6, minPeople: 2 },
+  { code: 'craft-course2', label: 'Afternoon Craft Tour — Calligraphy + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
+  { code: 'craft-course3', label: 'Afternoon Craft Tour — Indigo Dyeing + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
 ];
 
 const state = {
@@ -181,6 +185,8 @@ function renderActivities() {
 function activityKind() { const a = ACTIVITIES.find((x) => x.code === state.activity); return a ? a.kind : null; }
 // 選択中アクティビティの人数上限（未定義なら従来どおり20）。
 function activityMaxPeople() { const a = ACTIVITIES.find((x) => x.code === state.activity); return (a && a.maxPeople) || 20; }
+// 選択中アクティビティの人数下限（未定義なら1。午後工芸ツアーは少人数制のため2）。
+function activityMinPeople() { const a = ACTIVITIES.find((x) => x.code === state.activity); return (a && a.minPeople) || 1; }
 
 /* ---- Step 2: date ---- */
 function renderDates() {
@@ -435,14 +441,17 @@ function renderTourDetails(sec) {
 function renderPeople(sec) {
   sec.appendChild(el('h3', 'step-title', bi('人数', 'Number of people')));
   const row = el('div', 'people-row');
-  // アクティビティごとの人数上限（アルグブルー2／e-bike各4／姫路城ガイド8）。
+  // アクティビティごとの人数上限（アルグブルー2／e-bike各4／姫路城ガイド8／午後工芸ツアー6）と下限（工芸ツアーのみ2）。
   const maxPeople = activityMaxPeople();
+  const minPeople = activityMinPeople();
   if (state.people > maxPeople) state.people = maxPeople;
-  const input = el('input'); input.type = 'number'; input.min = '1'; input.max = String(maxPeople); input.value = state.people;
-  // max属性だけだと手入力で超過できるため、状態も上限で丸める。
-  input.oninput = () => { state.people = Math.min(maxPeople, Math.max(1, Number(input.value) || 1)); renderSummary(); };
-  input.onchange = () => { input.value = state.people; }; // 確定時に見た目も上限へ揃える
+  if (state.people < minPeople) state.people = minPeople;
+  const input = el('input'); input.type = 'number'; input.min = String(minPeople); input.max = String(maxPeople); input.value = state.people;
+  // min/max属性だけだと手入力で超過できるため、状態も上下限で丸める。
+  input.oninput = () => { state.people = Math.min(maxPeople, Math.max(minPeople, Number(input.value) || minPeople)); renderSummary(); };
+  input.onchange = () => { input.value = state.people; }; // 確定時に見た目も上下限へ揃える
   row.appendChild(input);
+  if (minPeople > 1) row.appendChild(el('p', 'muted small', bi('最少' + minPeople + '名から承ります', 'Minimum ' + minPeople + ' people for this tour')));
   sec.appendChild(row);
 }
 
@@ -509,6 +518,7 @@ function renderSummary() {
 
 function isReady() {
   if (!state.activity || !state.date || !state.people) return false;
+  if (Number(state.people) < activityMinPeople()) return false;
   if (!state.name || !state.email) return false;
   if (activityKind() === 'algueblue') {
     if (!state.plan || !state.start || !state.pickup) return false;
