@@ -47,7 +47,10 @@ const CONFIG = {
   availabilitySheetName: 'Availability',
   archiveSheetName: 'Archive',
   syncDays: 15,
+  // ツアー/送迎の自動割当対象（booking_webapp.gsでも共有利用=Kana/Shoのまま変更しない）
   staffPriority: ['Kana', 'Sho'],
+  // Availabilityシートの休み追跡・close連動だけの対象（ツアー自動割当の候補には含めない）
+  absenceOnlyStaff: ['Iwata'],
   staff: {
     Kana: {
       aliases: ['Kana', '畑中'],
@@ -56,6 +59,16 @@ const CONFIG = {
     Sho: {
       aliases: ['Sho', '砂川'],
       calendarMode: 'offOnly',
+    },
+    Iwata: {
+      // 2026-09-02追加: 姫路城ガイド担当。判定はエイリアス文字列ではなく
+      // カレンダー予定の「作成者」= creatorEmail で行う（ユーザー指定。Algueblueの
+      // 作成者判定と同方式）。creatorEmail一致イベントが無い枠は砂川と同じ
+      // offOnly方式で「予定なし=Available」判定になる。
+      aliases: ['Iwata', '岩田'],
+      calendarMode: 'offOnly',
+      creatorEmail: 'yrock1979@gmail.com',
+      defaultWorkingHours: '9:30–18:00', // 砂川さんと同じ値（2026-09-03 ユーザー確認済み）
     },
   },
   slotWindows: {
@@ -98,7 +111,7 @@ const CONFIG = {
 tours: [
   {
     name: 'e-bike Ride around the Castle',
-    capacity: 4,
+    capacity: 5, // 2026-09-02: 4→5
     patterns: [
       /e-?bike\s+ride\s+around\s+the\s+castle.*slurp\s+like\s+a\s+local/i,
       /castle\s+town/i,
@@ -106,7 +119,7 @@ tours: [
   },
   {
     name: 'e-bike Ride to the Sea',
-    capacity: 4,
+    capacity: 5, // 2026-09-02: 4→5
     patterns: [
       /e-?bike\s+ride\s+to\s+the\s+sea.*slurp\s+like\s+a\s+local/i,
       /shikama\s+kaido/i,
@@ -119,7 +132,7 @@ tours: [
   },
   {
     name: 'e-Bike Tour in the Shisō Region with Lunch at a Sake Brewery',
-    capacity: 4,
+    capacity: 8, // 2026-09-02: 4→8（宍粟）
     patterns: [
       /e-?bike\s+tour\s+in\s+the\s+shis[oō]\s+region/i,
       /sake\s+brewery/i,
@@ -127,7 +140,7 @@ tours: [
   },
   {
     name: 'e-bike Head to the Healing Cave',
-    capacity: 4,
+    capacity: 8, // 2026-09-02: 4→8（安富）
     patterns: [/healing\s+cave/i, /hidden\s+land\s+ride\s+and\s+hike/i],
   },
 ],
@@ -157,6 +170,48 @@ tours: [
   // 全休: 全ツアー(城ガイド含む)を Off にする
   closeAllPatterns: [/全休/, /全ツアークローズ/, /臨時休業/, /\bCLOSED\b/i],
 };
+
+// Availabilityシートに行を出す・close連動させる対象の全スタッフ（staffPriority + absenceOnlyStaff）。
+// ツアー自動割当(assignBooking_/ensureDateSlotRows_)は引き続きstaffPriorityのみを使う。
+CONFIG.allTrackedStaff = CONFIG.staffPriority.concat(CONFIG.absenceOnlyStaff || []);
+
+// RentalCycle（ガイドなしレンタル自転車）: 2026-09-02指定。身長帯別の在庫内訳（合計9台）。
+// 予約メモに身長の記載が無い場合は151cm帯(3台=旧「標準3台」に相当)だけを使う。
+// 151cm+153cm=5台が旧「Max5台・要相談」に相当し、160cm/165cm帯はそれを身長条件付きで
+// さらに拡張したもの。tiersはminHeightCm昇順で保持する。
+CONFIG.rentalCycle = {
+  tiers: [
+    { minHeightCm: 151, count: 3 },
+    { minHeightCm: 153, count: 2 },
+    { minHeightCm: 160, count: 2 },
+    { minHeightCm: 165, count: 2 },
+  ],
+};
+
+// 宍粟・安富: ガイド1名+補助1名の計2名体制が必須（2026-09-02指定）。
+// 優先ペアは順に試す。通常はKana+Sho。どちらかが休みの時のみ岩田さんで対称的に代替。
+// 2名そろわない場合（岩田さん1名だけ等）は催行不可。
+CONFIG.twoPersonTours = [
+  'e-Bike Tour in the Shisō Region with Lunch at a Sake Brewery', // 宍粟
+  'e-bike Head to the Healing Cave', // 安富
+];
+CONFIG.twoPersonTeams = [
+  ['Kana', 'Sho'],
+  ['Sho', 'Iwata'],
+  ['Kana', 'Iwata'],
+];
+
+// 自転車の共有プール（2026-09-02指定）: 総保有9台。RentalCycle標準3台は割当の目安であって
+// 別プールではない。ツアー(旧街道/飾磨街道/宍粟/安富)が無ければRentalCycleにも9台まで融通可。
+// → 同一日+枠でこの5種の予約Booked合計が9台を超えないことだけをチェックする。
+CONFIG.bikeFleet = { totalBikes: 9 };
+CONFIG.bikeTours = [
+  'e-bike Ride around the Castle',
+  'e-bike Ride to the Sea',
+  'e-Bike Tour in the Shisō Region with Lunch at a Sake Brewery',
+  'e-bike Head to the Healing Cave',
+  'RentalCycle',
+];
 
 function syncAvailability() {
 
@@ -368,7 +423,7 @@ function applyStaffOccupancy_(map, occupancyMap) {
 // テキスト（主に説明欄）に含まれる全スタッフを alias 部分一致で返す
 function detectAllStaffInText_(text) {
   const found = [];
-  CONFIG.staffPriority.forEach(function(staffName) {
+  CONFIG.allTrackedStaff.forEach(function(staffName) {
     const matched = CONFIG.staff[staffName].aliases.some(function(alias) {
       return new RegExp(escapeRegExp_(alias), 'i').test(text);
     });
@@ -421,12 +476,18 @@ const start = event.getStartTime();
   }
 
 const tour = isRentalCycle
-  ? { name: 'RentalCycle', capacity: '' }
+  ? { name: 'RentalCycle', capacity: CONFIG.bikeFleet.totalBikes }
   : detectTour_(text);
   const booked = detectBookedCount_(text);
   const bookingId = detectBookingId_(text);
   const bookingKey = bookingId || event.getId();
   const staff = detectStaff_(text);
+  // 宍粟・安富(2名体制)向け: メモ欄に書かれている担当者名を全員拾う（岩田さんも検出対象）。
+  // 「担当:砂川、岩田」のようにメモへ明記されていれば、優先順位の自動推測より
+  // これを優先して使う（assignTwoPersonBooking_側で参照）。
+  const staffList = detectAllStaffInText_(text);
+  // RentalCycle向け: メモに身長記載があれば拾う（無ければnull=151cm帯のみ使用）。
+  const heightCm = isRentalCycle ? detectHeightCm_(text) : null;
   const errors = [];
 
   if (!tour) {
@@ -448,6 +509,8 @@ const tour = isRentalCycle
     booked: booked || '',
     capacity: tour ? tour.capacity : '',
     staff: staff,
+    staffList: staffList,
+    heightCm: heightCm,
     notes: buildBookingNotes_(bookingKey, title, errors),
     errors: errors,
   };
@@ -485,7 +548,7 @@ function archivePastRows() {
 function buildBaseAvailability_(dates, staffEventsByDate) {
   const map = {};
   dates.sort().forEach(function(dateKey) {
-    CONFIG.staffPriority.forEach(function(staffName) {
+    CONFIG.allTrackedStaff.forEach(function(staffName) {
       // 実勤務時間（読みやすい表示）は日付×スタッフで1回だけ算出し、AM/PM両方に入れる
       const workingHours = staffWorkingHoursText_(staffName, dateKey, staffEventsByDate);
       ['AM', 'PM'].forEach(function(slot) {
@@ -545,6 +608,7 @@ function staffWorkingHoursText_(staffName, dateKey, staffEventsByDate) {
 
     if (cfg.calendarMode === 'offOnly') {
       if (allDayOff) return '休み';
+      const baseHours = cfg.defaultWorkingHours || '9:30–18:00';
       const offs = evs.filter(function(e) { return isOffEvent_(e) && !e.isAllDayEvent(); })
         .map(function(e) {
           const r = parseTimeRange_(eventText_(e));
@@ -553,7 +617,7 @@ function staffWorkingHoursText_(staffName, dateKey, staffEventsByDate) {
           return (s && en) ? (fmt(s) + '–' + fmt(en)) : null;
         })
         .filter(Boolean);
-      return offs.length ? ('9:30–18:00（休 ' + offs.join(', ') + '）') : '9:30–18:00';
+      return offs.length ? (baseHours + '（休 ' + offs.join(', ') + '）') : baseHours;
     }
     return '';
   } catch (err) {
@@ -688,14 +752,141 @@ function applyBookings_(map, bookings, warnings) {
 
   Object.keys(groupedBySlot).forEach(function(groupKey) {
     const bookingsInSlot = groupedBySlot[groupKey];
+    // 同一日+枠の自転車消費（旧街道/飾磨街道/宍粟/安富/RentalCycle 共通9台プール）を積算しながら割当。
+    // 台数が足りない予約はスタッフ枠を消費させず、Notesにエラーを残すだけにする。
+    let bikesUsed = 0;
+    // RentalCycleの身長帯別在庫の残数（CONFIG.rentalCycle.tiersの並び順で保持）。
+    // 身長未記載の予約は151cm帯(3台)しか使えない。
+    const rentalCycleTierRemaining = CONFIG.rentalCycle.tiers.map(function(tier) { return tier.count; });
 
     bookingsInSlot.forEach(function(booking) {
-      assignBooking_(map, booking, warnings);
+      const needsBikes = CONFIG.bikeTours.indexOf(booking.tour) !== -1;
+      const neededBikes = needsBikes ? (Number(booking.booked) || 0) : 0;
+      const isRentalCycleBooking = booking.tour === 'RentalCycle';
+
+      if (isRentalCycleBooking &&
+          !allocateRentalCycleTierBikes_(rentalCycleTierRemaining, booking.heightCm, neededBikes)) {
+        const message = 'Not enough height-eligible RentalCycle bikes' +
+          (booking.heightCm != null ? ' (height ' + booking.heightCm + 'cm)' : ' (height not specified, 151cm tier only)') +
+          ' for booking ' + (booking.bookingId || booking.eventId || '');
+        console.error(message);
+        recordSlotError_(map, booking.date, booking.slot, message);
+        return;
+      }
+
+      if (needsBikes && bikesUsed + neededBikes > CONFIG.bikeFleet.totalBikes) {
+        const message = 'Not enough bikes in shared fleet (total ' + CONFIG.bikeFleet.totalBikes +
+          ', already committed ' + bikesUsed + ') for booking ' + (booking.bookingId || booking.eventId || '');
+        console.error(message);
+        recordSlotError_(map, booking.date, booking.slot, message);
+        return;
+      }
+
+      if (CONFIG.twoPersonTours.indexOf(booking.tour) !== -1) {
+        assignTwoPersonBooking_(map, booking, warnings);
+      } else {
+        assignBooking_(map, booking, warnings);
+      }
+      if (needsBikes) bikesUsed += neededBikes;
     });
     if (bookingsInSlot[0].tour === 'RentalCycle') {
   return;
 }
+    if (CONFIG.twoPersonTours.indexOf(bookingsInSlot[0].tour) !== -1) {
+      // 2名体制ツアーは assignTwoPersonBooking_ 側で両名を直接締める。
+      // Kana+Sho以外(岩田さん含む代替ペア)の場合に一般closeOtherAutoRows_を
+      // 通すと、まだ判定していない別ペアの成立可否と無関係にstaffPriority側を
+      // 誤って閉じてしまうため、ここでは何もしない。
+      return;
+    }
     closeOtherAutoRows_(map, bookingsInSlot[0].date, bookingsInSlot[0].slot);
+  });
+}
+
+// 宍粟・安富: ガイド1名+補助1名の計2名体制が必須。
+// CONFIG.twoPersonTeams を優先順に試し、両名ともAvailable(かつ未使用/同一予約)なら成立。
+// どのペアも揃わない場合は割当不可（岩田さん1名だけ等では催行しない）。
+function assignTwoPersonBooking_(map, booking, warnings) {
+  ensureDateSlotRows_(map, booking.date, booking.slot);
+  ensureStaffSlotRow_(map, booking.date, 'Iwata', booking.slot);
+
+  function pairIsValid_(pair) {
+    const rows = pair.map(function(staffName) {
+      return map[makeKey_(booking.date, staffName, booking.slot)];
+    });
+    return rows.every(function(row) {
+      return row && !isManualLocked_(row) && row.Status === 'Available' &&
+        (!row.Tour || row.Tour === booking.tour || sameBooking_(row, booking));
+    });
+  }
+
+  let chosenPair = null;
+
+  // 1. 予約メモに担当者名が明記されていれば最優先（人の判断を信頼する）。
+  //    定義済みペアと一致しない、または空きと矛盾する場合はエラー記録のみで、
+  //    自動推測へのフォールバックはしない（メモと違うペアを勝手に割り当てて
+  //    現場を混乱させないため）。
+  const namedStaff = (booking.staffList || []).filter(function(name) {
+    return CONFIG.allTrackedStaff.indexOf(name) !== -1;
+  });
+  if (namedStaff.length === 2) {
+    const isRecognizedPair = CONFIG.twoPersonTeams.some(function(pair) {
+      return pairMatches_(pair, namedStaff);
+    });
+    if (!isRecognizedPair) {
+      const message = 'Memo names an unsupported staff pair (' + namedStaff.join('+') + ') for booking ' +
+        (booking.bookingId || booking.eventId || '');
+      console.error(message);
+      recordSlotError_(map, booking.date, booking.slot, message);
+      return;
+    }
+    if (!pairIsValid_(namedStaff)) {
+      const message = 'Memo names ' + namedStaff.join('+') + ' but one of them is unavailable for booking ' +
+        (booking.bookingId || booking.eventId || '');
+      console.error(message);
+      recordSlotError_(map, booking.date, booking.slot, message);
+      return;
+    }
+    chosenPair = namedStaff;
+  }
+
+  // 2. メモに担当者名が無い場合（外部Bokun同期直後でまだ内部注記が無い等）のみ、
+  //    優先順位 [Kana+Sho] → [Sho+Iwata] → [Kana+Iwata] で自動推測する。
+  if (!chosenPair) {
+    for (let i = 0; i < CONFIG.twoPersonTeams.length; i++) {
+      if (pairIsValid_(CONFIG.twoPersonTeams[i])) {
+        chosenPair = CONFIG.twoPersonTeams[i];
+        break;
+      }
+    }
+  }
+
+  if (!chosenPair) {
+    const message = 'No available 2-person team (Kana+Sho / Sho+Iwata / Kana+Iwata) for booking ' +
+      (booking.bookingId || booking.eventId || '');
+    console.error(message);
+    recordSlotError_(map, booking.date, booking.slot, message);
+    return;
+  }
+
+  chosenPair.forEach(function(staffName, idx) {
+    const key = makeKey_(booking.date, staffName, booking.slot);
+    const row = map[key];
+    const existingBooked = Number(row.Booked) || 0;
+    const incomingBooked = Number(booking.booked) || 0;
+    const sameTour = !row.Tour || row.Tour === booking.tour;
+
+    row.Status = 'Available';
+    row.Tour = booking.tour || row.Tour;
+    row.Booked = sameTour ? existingBooked + incomingBooked || booking.booked : booking.booked;
+    row.Capacity = booking.capacity || row.Capacity;
+    row.Notes = appendNote_(row.Notes, idx === 0 ? booking.notes : appendNote_(booking.notes, '補助'));
+    row.Source = 'Bokun';
+    row['Manual Lock'] = 'FALSE';
+
+    if (warnings.indexOf(key) !== -1) {
+      row.Notes = appendNote_(row.Notes, 'Warning: Booking updated a row that had manual-looking unlocked values.');
+    }
   });
 }
 
@@ -753,6 +944,9 @@ function assignBooking_(map, booking, warnings) {
 }
 
 function closeOtherAutoRows_(map, dateKey, slot) {
+  // staffPriority(Kana/Sho)限定。岩田さんは宍粟/安富の2名体制でのみ使う要員なので、
+  // 旧街道・飾磨街道・姫路城ガイド等の単独ツアー予約では自動closeの対象に含めない
+  // （宍粟/安富の2名締めは assignTwoPersonBooking_ が個別に行う）。
   CONFIG.staffPriority.forEach(function(staffName) {
     const key = makeKey_(dateKey, staffName, slot);
     const row = map[key];
@@ -771,24 +965,39 @@ function closeOtherAutoRows_(map, dateKey, slot) {
 
 function ensureDateSlotRows_(map, dateKey, slot) {
   CONFIG.staffPriority.forEach(function(staffName) {
-    const key = makeKey_(dateKey, staffName, slot);
-    if (!map[key]) {
-      map[key] = blankRow_(dateKey, staffName, slot);
-      map[key].Status = CONFIG.staff[staffName].calendarMode === 'offOnly' ? 'Available' : 'Off';
-      map[key].Source = 'Calendar';
-    }
+    ensureStaffSlotRow_(map, dateKey, staffName, slot);
   });
 }
 
+function ensureStaffSlotRow_(map, dateKey, staffName, slot) {
+  const key = makeKey_(dateKey, staffName, slot);
+  if (!map[key]) {
+    map[key] = blankRow_(dateKey, staffName, slot);
+    map[key].Status = CONFIG.staff[staffName].calendarMode === 'offOnly' ? 'Available' : 'Off';
+    map[key].Source = 'Calendar';
+  }
+  return map[key];
+}
+
 function isRelevantEvent_(event) {
+  // タイトル/説明に何も追跡用の文言が無くても、追跡対象スタッフ(岩田さん等)が
+  // 作成したイベントなら関連イベントとして扱う（休み予定に名前が入らない場合の対策）。
+  if (isCreatorRelevant_(event)) return true;
   const text = eventText_(event);
   return CONFIG.relevantEventPatterns.some(function(pattern) {
     return pattern.test(text);
   });
 }
 
+function isCreatorRelevant_(event) {
+  return Object.keys(CONFIG.staff).some(function(staffName) {
+    const cfg = CONFIG.staff[staffName];
+    return cfg.creatorEmail && eventCreatedBy_(event, cfg.creatorEmail);
+  });
+}
+
 function isStaffCalendarEvent_(event) {
-  return CONFIG.staffPriority.some(function(staffName) {
+  return CONFIG.allTrackedStaff.some(function(staffName) {
     return eventMatchesStaff_(event, staffName);
   }) && !isBookingCalendarEvent_(event);
 }
@@ -801,10 +1010,29 @@ function isBookingCalendarEvent_(event) {
 }
 
 function eventMatchesStaff_(event, staffName) {
+  const staffConfig = CONFIG.staff[staffName];
+  // creatorEmail設定あり（岩田さん）: その作成者のイベントは無条件に本人の予定として扱う。
+  // タイトル/説明に名前が入っていない予定（休みの✖等）でも判定できるようにするため。
+  if (staffConfig.creatorEmail && eventCreatedBy_(event, staffConfig.creatorEmail)) {
+    return true;
+  }
   const text = eventText_(event);
-  return CONFIG.staff[staffName].aliases.some(function(alias) {
+  return staffConfig.aliases.some(function(alias) {
     return new RegExp(escapeRegExp_(alias), 'i').test(text);
   });
+}
+
+// イベントの作成者がemailと一致するか（Algueblue判定と同じ getCreators() 方式）。
+// 取得失敗時は安全側でfalseを返し、同期全体は止めない。
+function eventCreatedBy_(event, email) {
+  try {
+    const creators = event.getCreators() || [];
+    return creators.some(function(c) {
+      return String(c).toLowerCase() === String(email).toLowerCase();
+    });
+  } catch (err) {
+    return false;
+  }
 }
 
 function isOffEvent_(event) {
@@ -895,6 +1123,49 @@ function detectBookedCount_(text) {
     if (match) return Number(match[1]);
   }
   return null;
+}
+
+// RentalCycle予約メモの身長記載を検出（例: "160cm" "身長160" "160センチ" "160㎝"）。
+// 複数の身長が書かれている場合（グループ予約）は一番低い値＝一番厳しい条件を採用する。
+function detectHeightCm_(text) {
+  const pattern = /(\d{2,3})\s*(?:cm|センチ|㎝)|身長\s*[:：]?\s*(\d{2,3})/gi;
+  let match;
+  let minHeight = null;
+  while ((match = pattern.exec(String(text || ''))) !== null) {
+    const value = Number(match[1] || match[2]);
+    if (!isNaN(value) && (minHeight === null || value < minHeight)) {
+      minHeight = value;
+    }
+  }
+  return minHeight;
+}
+
+// RentalCycleの身長帯別在庫からneededBikes台を確保できるか判定し、できれば在庫を消費する。
+// 温存のため、条件を満たす帯の中でminHeightCmが高い(=適用範囲が狭い)帯から優先的に使う。
+// heightCmがnull（身長未記載）の場合は151cm帯のみ対象。
+function allocateRentalCycleTierBikes_(tierRemaining, heightCm, neededBikes) {
+  const eligible = [];
+  for (let t = 0; t < CONFIG.rentalCycle.tiers.length; t++) {
+    const tier = CONFIG.rentalCycle.tiers[t];
+    const ok = heightCm == null ? tier.minHeightCm === 151 : heightCm >= tier.minHeightCm;
+    if (ok) eligible.push(t);
+  }
+  eligible.sort(function(a, b) {
+    return CONFIG.rentalCycle.tiers[b].minHeightCm - CONFIG.rentalCycle.tiers[a].minHeightCm;
+  });
+
+  let available = 0;
+  eligible.forEach(function(idx) { available += tierRemaining[idx]; });
+  if (available < neededBikes) return false;
+
+  let remaining = neededBikes;
+  eligible.forEach(function(idx) {
+    if (remaining <= 0) return;
+    const use = Math.min(remaining, tierRemaining[idx]);
+    tierRemaining[idx] -= use;
+    remaining -= use;
+  });
+  return true;
 }
 
 function detectBookingId_(text) {
@@ -1060,6 +1331,14 @@ function sameBooking_(row, booking) {
   return booking.bookingId && notes.indexOf(booking.bookingId) !== -1;
 }
 
+// 2つのスタッフ名配列が同じペアかどうか（順不同）
+function pairMatches_(pairA, pairB) {
+  if (pairA.length !== pairB.length) return false;
+  const sortedA = pairA.slice().sort();
+  const sortedB = pairB.slice().sort();
+  return sortedA.every(function(name, i) { return name === sortedB[i]; });
+}
+
 function makeKey_(dateKey, staffName, slot) {
   return [dateKey, staffName, slot].join('|');
 }
@@ -1068,7 +1347,7 @@ function sortAvailabilityKeys_(a, b) {
   const partsA = a.split('|');
   const partsB = b.split('|');
   if (partsA[0] !== partsB[0]) return partsA[0] < partsB[0] ? -1 : 1;
-  const staffDiff = CONFIG.staffPriority.indexOf(partsA[1]) - CONFIG.staffPriority.indexOf(partsB[1]);
+  const staffDiff = CONFIG.allTrackedStaff.indexOf(partsA[1]) - CONFIG.allTrackedStaff.indexOf(partsB[1]);
   if (staffDiff !== 0) return staffDiff;
   return partsA[2] === partsB[2] ? 0 : partsA[2] === 'AM' ? -1 : 1;
 }
