@@ -30,7 +30,8 @@ const ACTIVITIES = [
   { code: 'algueblue',    label: 'Thalassotherapy Spa (Algueblue)', kind: 'algueblue', maxPeople: 2 },
   { code: 'ebike-castle', label: 'e-bike Ride around the Castle',    kind: 'tour', maxPeople: 4 },
   { code: 'ebike-sea',    label: 'e-bike Ride to the Sea',          kind: 'tour', maxPeople: 4 },
-  { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour', maxPeople: 8 },
+  // payFirst: バックエンド(BOOKING_CONFIG.tours['castle-guide'].payFirst)と揃える。2026-08 先払い制トライアル第1弾。
+  { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour', maxPeople: 8, payFirst: true },
   { code: 'craft-course1', label: 'Afternoon Craft Tour — Calligraphy + Wagashi Making', kind: 'tour', maxPeople: 6, minPeople: 2 },
   { code: 'craft-course2', label: 'Afternoon Craft Tour — Calligraphy + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
   { code: 'craft-course3', label: 'Afternoon Craft Tour — Indigo Dyeing + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
@@ -93,15 +94,21 @@ function updateChrome() {
   const sumH = document.querySelector('#summary-section .step-title');
   if (sumH) sumH.textContent = alg ? 'ご予約内容 / Summary' : 'Summary';
   const btn = $('#submit-btn');
-  if (btn) btn.textContent = alg ? '予約する / Confirm booking' : 'Confirm booking';
+  if (btn) btn.textContent = activityPayFirst() ? 'Continue to payment' : (alg ? '予約する / Confirm booking' : 'Confirm booking');
   const pay = document.querySelector('#summary-section .muted.small');
   if (pay) {
-    let t = alg
-      ? 'ご確定後、次の画面でPayPalにてお支払いいただけます。ご入金の確認をもってご予約完了となります。 / After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.'
-      : 'After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.';
-    if (isSameDay()) t += alg
-      ? '　当日のご予約に限り、当日現地でのお支払いも可能です。 / For same-day bookings, you may also pay on site.'
-      : ' For same-day bookings, you may also pay on site.';
+    let t;
+    if (activityPayFirst()) {
+      // 先払い制：現地払いの選択肢は無い。送信後は必ずPayPalの決済ページへ移動する旨を明確に伝える。
+      t = 'You will be taken to PayPal to pay now. Your booking is confirmed once payment is completed.';
+    } else {
+      t = alg
+        ? 'ご確定後、次の画面でPayPalにてお支払いいただけます。ご入金の確認をもってご予約完了となります。 / After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.'
+        : 'After you confirm, you can pay by PayPal on the next screen. Your booking is complete once we receive your payment.';
+      if (isSameDay()) t += alg
+        ? '　当日のご予約に限り、当日現地でのお支払いも可能です。 / For same-day bookings, you may also pay on site.'
+        : ' For same-day bookings, you may also pay on site.';
+    }
     pay.textContent = t;
   }
   const priv = $('#privacy-note');
@@ -127,8 +134,13 @@ function subtractMinutes(hhmm, min) {
 }
 
 async function init() {
-  // 今日・明日ページのカードや WPのプランボタンから activity / date / plan を引き継いで事前選択
   const qs = new URLSearchParams(location.search);
+
+  // 先払い制（PayPal Orders v2）からの戻り。通常のウィザードは出さず、専用の画面だけ表示する。
+  if (qs.get('cancelled') === '1') { showPaymentCancelled(); return; }
+  if (qs.get('paypalReturn') === '1' && qs.get('token')) { showPaymentPendingConfirmation(); return; }
+
+  // 今日・明日ページのカードや WPのプランボタンから activity / date / plan を引き継いで事前選択
   const preset = qs.get('activity');
   if (preset && ACTIVITIES.some((a) => a.code === preset)) state.activity = preset;
   state.presetDate = qs.get('date') || null;
@@ -189,6 +201,8 @@ function activityKind() { const a = ACTIVITIES.find((x) => x.code === state.acti
 function activityMaxPeople() { const a = ACTIVITIES.find((x) => x.code === state.activity); return (a && a.maxPeople) || 20; }
 // 選択中アクティビティの人数下限（未定義なら1。午後工芸ツアーは少人数制のため2）。
 function activityMinPeople() { const a = ACTIVITIES.find((x) => x.code === state.activity); return (a && a.minPeople) || 1; }
+// 選択中アクティビティが先払い制（PayPal Orders v2、送信後は必ず決済ページへ移動＝現地払い選択肢なし）か。
+function activityPayFirst() { const a = ACTIVITIES.find((x) => x.code === state.activity); return !!(a && a.payFirst); }
 
 /* ---- Step 2: date ---- */
 function renderDates() {
@@ -617,18 +631,48 @@ async function submit() {
     pickup: state.pickup || '',
   };
   try {
-    const res = await fetch(WEBAPP_URL, {
+    const res = await fetch(WEBAPP_URL + '?action=createBooking', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoid CORS preflight
       body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Booking failed');
+    // 先払い制のアクティビティはここで approveUrl が返る＝PayPalの決済ページへ移動する。
+    // 従来どおりのアクティビティは approveUrl が無いので、これまでと同じ完了画面を出す。
+    if (data.approveUrl) {
+      location.href = data.approveUrl;
+      return;
+    }
     showDone(data);
   } catch (err) {
     $('#status').textContent = 'Sorry — ' + err.message;
     $('#submit-btn').disabled = false;
   }
+}
+
+// PayPalでの支払い承認が完了し、booking.html に戻ってきた直後の画面。
+// この時点ではまだ Webhook 側の確定処理（カレンダー確保）が完了しているとは限らないため、
+// 「確認中」であることを伝える（過度な確約はしない）。
+function showPaymentPendingConfirmation() {
+  $('#form-body').hidden = true;
+  $('#done').hidden = false;
+  $('#done').innerHTML =
+    '<div class="done-check">✓</div>' +
+    '<h2>Payment received</h2>' +
+    '<p class="muted">We are finalizing your booking now. You will receive a confirmation email within a few minutes.</p>' +
+    '<p class="muted small">If you do not receive an email within 30 minutes, please contact ' +
+    '<a href="mailto:comecomehimeji@gmail.com">comecomehimeji@gmail.com</a>.</p>';
+}
+
+// PayPalの決済ページで「キャンセル」して戻ってきた画面。支払いも予約枠の確保もされていない旨を明確にする。
+function showPaymentCancelled() {
+  $('#form-body').hidden = true;
+  $('#done').hidden = false;
+  $('#done').innerHTML =
+    '<h2>Payment not completed</h2>' +
+    '<p class="muted">No payment was taken and no time slot was held. Feel free to book again whenever you are ready.</p>' +
+    '<a class="pay-btn" href="' + location.pathname + '">Back to booking form</a>';
 }
 
 function showDone(data) {
