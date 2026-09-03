@@ -61,10 +61,12 @@ const CONFIG = {
       calendarMode: 'offOnly',
     },
     Iwata: {
-      // 2026-09-02追加: 姫路城ガイド担当。判定はエイリアス文字列ではなく
-      // カレンダー予定の「作成者」= creatorEmail で行う（ユーザー指定。Algueblueの
-      // 作成者判定と同方式）。creatorEmail一致イベントが無い枠は砂川と同じ
-      // offOnly方式で「予定なし=Available」判定になる。
+      // 2026-09-02追加（2026-09-03 役割訂正）: アクティビティジャパン(AJ)経由のツアーは
+      // 岩田さんのみが担当可能。このシステム(Bokun/自社予約フォーム)が扱う宍粟・安富の
+      // 2名体制ツアーでは補助員としてのみ使う（twoPersonTeams参照）。姫路城ガイドは担当しない。
+      // 判定はエイリアス文字列ではなくカレンダー予定の「作成者」= creatorEmail で行う
+      // （ユーザー指定。Algueblueの作成者判定と同方式）。creatorEmail一致イベントが無い枠は
+      // 砂川と同じoffOnly方式で「予定なし=Available」判定になる。
       aliases: ['Iwata', '岩田'],
       calendarMode: 'offOnly',
       creatorEmail: 'yrock1979@gmail.com',
