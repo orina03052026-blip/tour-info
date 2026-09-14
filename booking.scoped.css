@@ -1,0 +1,104 @@
+/* テーマ(Lightning)側にも同名の汎用クラス(.page-header等)があり、詳細度が同点または
+   それ以上のためソース順・詳細度次第でテーマのルール(min-height:360pxのヒーロー用スタイル等)が
+   勝ってしまう事故があった。all:revert + このファイル全体の !important でテーマ側を確実に遮断する。 */
+.booking-embed, .booking-embed * { all: revert !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
+/* revert後、[hidden] 属性によるdisplay:noneも同じ理由で明示しておく。 */
+.booking-embed [hidden] { display: none !important; }
+
+.booking-embed * { box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
+
+.booking-embed { font-family: 'Helvetica Neue', Arial, sans-serif !important; background: #f0f7fa !important; color: #1f3a4a !important; padding: 16px !important; font-size: 15px !important; line-height: 1.45 !important; color-scheme: light only !important; }
+.booking-embed, .booking-embed * { color-scheme: light only !important; }
+
+.booking-embed .booking-wrap { max-width: 640px !important; margin: 0 auto !important; }
+
+/* テーマとの兼ね合いで、見た目上のボックスとは無関係にクリック判定だけがこの見出しに残ってしまい、
+   下のボタン群を覆ってクリック不能にする事故があった。見出しはテキスト表示のみなので
+   pointer-events:none で完全にクリック判定から外す。 */
+.booking-embed .page-header { text-align: center !important; margin-bottom: 18px !important; pointer-events: none !important; }
+/* 2026-09-04: テーマ(Lightning)の .page-header::before が黒25%オーバーレイ(position:absolute想定、
+   このheaderにはposition:relativeが無いため実質ページ全体の高さまで伸びる)を生成し、カード全体が
+   灰色に見えるバグの原因になっていた。before/afterごと無効化する。 */
+.booking-embed .page-header::before, .booking-embed .page-header::after { content: none !important; display: none !important; }
+.booking-embed .page-title { font-size: 1.5rem !important; font-weight: 700 !important; color: #1f3a4a !important; }
+.booking-embed .page-subtitle { font-size: 0.9rem !important; color: #5b7280 !important; margin-top: 4px !important; }
+
+.booking-embed .card { background: #fff !important; border-radius: 16px !important; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important; padding: 20px !important; }
+
+.booking-embed .block { padding: 14px 0 !important; border-top: 1px solid #eef3f5 !important; }
+.booking-embed .block:first-child { border-top: none !important; padding-top: 0 !important; }
+
+.booking-embed .step-title { font-size: 0.8rem !important; text-transform: uppercase !important; letter-spacing: 0.6px !important; color: #5b7280 !important; margin: 4px 0 10px !important; }
+
+.booking-embed .choices { display: flex !important; flex-wrap: wrap !important; gap: 10px !important; }
+.booking-embed .choices.times { gap: 8px !important; }
+
+.booking-embed .choice { border: 1.5px solid #d7e3e8 !important; background: #fff !important; color: #1f3a4a !important; border-radius: 12px !important; padding: 11px 16px !important; font-size: 0.95rem !important; cursor: pointer !important; transition: all 0.15s ease !important; display: inline-flex !important; flex-direction: column !important; gap: 2px !important; line-height: 1.25 !important; }
+.booking-embed .choice:hover:not(.disabled) { border-color: #009efd !important; }
+.booking-embed .choice.selected { border-color: transparent !important; background: linear-gradient(135deg, #2af598, #009efd) !important; color: #fff !important; box-shadow: 0 4px 10px rgba(0, 158, 253, 0.3) !important; }
+.booking-embed .choice.selected .muted { color: rgba(255, 255, 255, 0.85) !important; }
+.booking-embed .choice.disabled { opacity: 0.4 !important; cursor: not-allowed !important; }
+.booking-embed .choice.plan { align-items: flex-start !important; min-width: 200px !important; }
+.booking-embed .choice.time { padding: 9px 14px !important; font-variant-numeric: tabular-nums !important; align-items: center !important; }
+.booking-embed .choice.time .time-main { font-size: 0.95rem !important; font-weight: 600 !important; }
+.booking-embed .choice.time .pickup-sub { font-size: 0.7rem !important; color: #5b7280 !important; font-variant-numeric: tabular-nums !important; }
+.booking-embed .choice.time.selected .pickup-sub { color: rgba(255, 255, 255, 0.9) !important; }
+
+.booking-embed .muted { color: #5b7280 !important; font-size: 0.85rem !important; }
+.booking-embed .small { font-size: 0.8rem !important; }
+
+.booking-embed .people-row input, .booking-embed .field input { width: 100% !important; border: 1.5px solid #d7e3e8 !important; border-radius: 10px !important; padding: 10px 12px !important; font-size: 1rem !important; color: #1f3a4a !important; }
+.booking-embed .people-row input { width: 110px !important; }
+.booking-embed .people-row input:focus, .booking-embed .field input:focus { outline: none !important; border-color: #009efd !important; }
+
+.booking-embed .field { display: block !important; margin-bottom: 10px !important; }
+.booking-embed .field-label { display: block !important; font-size: 0.82rem !important; color: #5b7280 !important; margin-bottom: 4px !important; }
+
+.booking-embed .summary { background: #f7fbfc !important; border-radius: 12px !important; margin-top: 8px !important; padding: 16px !important; border-top: none !important; }
+.booking-embed .sum-row { display: flex !important; justify-content: space-between !important; padding: 5px 0 !important; border-bottom: 1px dashed #e3edf0 !important; }
+.booking-embed .sum-row:last-child { border-bottom: none !important; }
+.booking-embed .sum-row span { color: #5b7280 !important; }
+
+.booking-embed .submit { width: 100% !important; margin-top: 14px !important; border: none !important; border-radius: 12px !important; padding: 14px !important; font-size: 1.05rem !important; font-weight: 700 !important; color: #fff !important; cursor: pointer !important; background: linear-gradient(135deg, #2af598, #009efd) !important; box-shadow: 0 6px 14px rgba(0, 158, 253, 0.35) !important; }
+.booking-embed .submit:disabled { background: #c5d3da !important; box-shadow: none !important; cursor: not-allowed !important; }
+
+.booking-embed .status { margin-top: 10px !important; text-align: center !important; color: #c0392b !important; font-size: 0.9rem !important; min-height: 1em !important; }
+
+.booking-embed .done { text-align: center !important; padding: 36px 20px !important; }
+.booking-embed .done-check { width: 56px !important; height: 56px !important; line-height: 56px !important; margin: 0 auto 12px !important; border-radius: 50% !important; color: #fff !important; font-size: 1.6rem !important; background: linear-gradient(135deg, #2af598, #009efd) !important; }
+.booking-embed .done h2 { color: #1f3a4a !important; margin-bottom: 8px !important; }
+.booking-embed .done p { margin: 4px 0 !important; }
+
+/* PayPal お支払いボタン（完了画面） */
+.booking-embed .pay-btn { display: block !important; width: 100% !important; margin-top: 18px !important; padding: 15px !important; border-radius: 12px !important; font-size: 1.1rem !important; font-weight: 700 !important; color: #fff !important; text-decoration: none !important; background: linear-gradient(135deg, #0070ba, #003087) !important; box-shadow: 0 6px 14px rgba(0, 112, 186, 0.35) !important; }
+.booking-embed .pay-btn:hover { filter: brightness(1.06) !important; }
+
+/* ---- アルグブルー用 月カレンダー ---- */
+.booking-embed .cal-head { display: flex !important; align-items: center !important; justify-content: space-between !important; margin-bottom: 10px !important; }
+.booking-embed .cal-title { font-size: 1rem !important; font-weight: 700 !important; color: #1f3a4a !important; }
+.booking-embed .cal-nav { border: 1.5px solid #d7e3e8 !important; background: #fff !important; color: #1f3a4a !important; border-radius: 10px !important; width: 40px !important; height: 36px !important; font-size: 1.2rem !important; line-height: 1 !important; cursor: pointer !important; transition: all 0.15s ease !important; }
+.booking-embed .cal-nav:hover:not(:disabled) { border-color: #009efd !important; }
+.booking-embed .cal-nav:disabled { opacity: 0.35 !important; cursor: not-allowed !important; }
+
+.booking-embed .cal-grid { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 6px !important; }
+.booking-embed .cal-dow { margin-bottom: 4px !important; }
+.booking-embed .cal-dowcell { text-align: center !important; font-size: 0.7rem !important; color: #5b7280 !important; padding: 2px 0 !important; }
+
+.booking-embed .cal-cell { aspect-ratio: 1 / 1 !important; border: 1.5px solid #d7e3e8 !important; background: #fff !important; color: #1f3a4a !important; border-radius: 10px !important; font-size: 0.9rem !important; font-variant-numeric: tabular-nums !important; cursor: pointer !important; transition: all 0.15s ease !important; padding: 0 !important; }
+.booking-embed .cal-cell.empty, .booking-embed .cal-cell.out { border: none !important; background: transparent !important; cursor: default !important; }
+.booking-embed .cal-cell.closed { color: #c5d3da !important; background: #f7fbfc !important; cursor: not-allowed !important; }
+.booking-embed .cal-cell.open:hover { border-color: #009efd !important; }
+.booking-embed .cal-cell.open { border-color: #2af598 !important; box-shadow: inset 0 0 0 1px rgba(42, 245, 152, 0.35) !important; font-weight: 600 !important; }
+.booking-embed .cal-cell.today { position: relative !important; }
+.booking-embed .cal-cell.today::after { content: '' !important; position: absolute !important; bottom: 5px !important; left: 50% !important; transform: translateX(-50%) !important; width: 4px !important; height: 4px !important; border-radius: 50% !important; background: #009efd !important; }
+.booking-embed .cal-cell.selected { border-color: transparent !important; color: #fff !important; box-shadow: 0 4px 10px rgba(0, 158, 253, 0.3) !important; background: linear-gradient(135deg, #2af598, #009efd) !important; }
+.booking-embed .cal-cell.selected.today::after { background: #fff !important; }
+
+/* ---- ツアー用「See more dates」トグル（アルグブルー以外のカレンダー展開） ---- */
+.booking-embed .link-toggle { background: none !important; border: none !important; color: #009efd !important; font-size: 0.85rem !important; cursor: pointer !important; padding: 6px 2px !important; text-decoration: underline !important; }
+.booking-embed .tour-calendar { margin-top: 10px !important; width: 100% !important; }
+
+/* ---- メンテナンス案内 ---- */
+.booking-embed .maint-notice { text-align: center !important; padding: 20px 8px !important; }
+.booking-embed .maint-notice h3 { font-size: 1.15rem !important; color: #1f3a4a !important; margin-bottom: 10px !important; }
+.booking-embed .maint-notice p { margin: 6px 0 !important; }

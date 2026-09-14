@@ -1,0 +1,427 @@
+# 訂正ノート — カレンダー同期ルールと実装修正指示（最終版）
+
+## 目的
+
+既存のドキュメントとコードに散逸・欠落があるため、
+実装（Apps Script）と運用ルール（Googleカレンダー登録）を統一する。
+
+---
+
+# 必須修正（ファイル別）
+
+## 1) apps_script/calendar_sync_complete.gs
+
+### CONFIG.staff
+
+```js
+const CONFIG = {
+  staff: {
+    sho: {
+      aliases: ['Sho', '砂川']
+    },
+
+    kana: {
+      aliases: ['Kana', '畑中']
+    }
+  }
+};
+```
+
+* スプレッドシート表記（Sho / Kana）
+* Googleカレンダー表記（砂川 / 畑中）
+
+の両方を aliases に含めること。
+
+---
+
+### OFF / AVAILABLE 判定
+
+```js
+const OFF_REGEX = /OFF|✖|❌|×|✕|✗/i;
+
+const AVAILABLE_REGEX = /〇|○|◯|⭕|🟢/;
+```
+
+---
+
+### AM / PM 判定ウィンドウ
+
+```js
+AM: 09:30–12:30
+PM: 13:30–17:00
+```
+
+---
+
+### determineStatus の仕様をコメント化
+
+* availability
+  → 勤務可能時間ベース
+
+* offOnly
+  → OFF 判定を最優先
+
+---
+
+### スタッフ判定
+
+alias の部分一致で判定する。
+
+Googleカレンダーでは
+以下の固定表記を使用すること：
+
+```txt
+砂川
+畑中
+```
+
+スプレッドシート側の表記（Sho / Kana）は
+aliases で対応する。
+
+---
+
+## 2) apps_script/sync_availability.gs
+
+### targetDates
+
+必ず：
+
+```txt
+today ～ today + syncDays
+```
+
+を全日含める。
+
+---
+
+### replaceSheetRows_ 使用時
+
+全消去→再書き込みする場合は、
+targetDates に全日付が含まれていること。
+
+または差分更新へ変更する。
+
+---
+
+### Manual Lock
+
+列名：
+
+```txt
+Manual Lock
+```
+
+TRUE の行は変更しない。
+
+---
+
+## 3) index.html
+
+### SHEET_CSV_URL 注記
+
+```txt
+/export?format=csv&gid=0
+```
+
+を使う理由を記載。
+
+Googleキャッシュ注意も追記。
+
+---
+
+### parseCsvDate 対応形式
+
+許可形式：
+
+```txt
+yyyy年M月d日
+yyyy/MM/dd
+yyyy-MM-dd
+```
+
+---
+
+## 4) ドキュメント（README / notes）
+
+以下を追加：
+
+* 運用ルール
+* テストケース
+* 初回セットアップ手順
+* Trigger 整理方法
+* Logs 確認方法
+
+---
+
+# Googleカレンダー運用ルール
+
+## 1. 勤務登録イベント
+
+勤務登録は「タイトル」で判定する。
+
+---
+
+### 出勤例
+
+```txt
+砂川〇 09:30-18:00
+```
+
+```txt
+畑中〇 09:30-14:00
+```
+
+---
+
+### 休み例
+
+```txt
+砂川✖
+```
+
+```txt
+畑中✖
+```
+
+---
+
+## 2. 予約済みイベント
+
+予約済み判定は、
+イベントタイトルではなく「説明欄(description)」を使用する。
+
+タイトルは自由。
+
+---
+
+### 説明欄例
+
+```txt
+参加スタッフ：
+砂川、畑中
+```
+
+---
+
+## 予約済み判定
+
+説明欄にスタッフ名が含まれている場合、
+そのイベント時間中は該当スタッフを予約済み（OFF）扱いにする。
+
+---
+
+# 判定優先順位
+
+1. Manual Lock = TRUE
+   → 一切変更しない
+
+2. ✖ / OFF
+   → 終日 Off
+
+3. 予約済みイベント重複
+   → 該当時間帯 Off
+
+4. 勤務時間不足
+   → Off
+
+5. 問題なし
+   → Available
+
+---
+
+# 判定ルール
+
+## 勤務時間判定
+
+スタッフ終了時刻 >= ツアー終了時刻
+
+→ Available
+
+それ以外
+
+→ Off
+
+---
+
+## PM判定
+
+PM判定は実際のツアー終了時刻を基準とする。
+
+例：
+
+* PMツアー 14:00-15:00
+  → 15:00 まで勤務なら Available
+
+* PMツアー 14:00-17:00
+  → 17:00 まで勤務必要
+
+---
+
+## 重複判定式
+
+以下を満たす場合は重複：
+
+```txt
+eventStart < tourEnd
+AND
+eventEnd > tourStart
+```
+
+---
+
+# テストケース
+
+## 1
+
+```txt
+Kana 09:30-12:00
+```
+
+* AM → Available
+* PM → Off
+
+---
+
+## 2
+
+```txt
+Kana 09:30-15:00
+```
+
+* PM 14:00-15:00 → Available
+* PM 14:00-17:00 → Off
+
+---
+
+## 3
+
+サイクリングツアー：
+
+```txt
+14:00-17:00
+```
+
+勤務：
+
+```txt
+Kana 09:30-15:00
+```
+
+→ PM = Off
+
+---
+
+## 4
+
+```txt
+Sho OFF
+```
+
+→ AM/PM = Off
+
+---
+
+## 5
+
+イベント説明欄にスタッフ名なし
+
+→ 無視
+
+---
+
+## 6
+
+```txt
+Manual Lock = TRUE
+```
+
+→ 更新しない
+
+---
+
+## 7（予約済み重複）
+
+### 勤務
+
+```txt
+砂川〇 09:30-18:00
+畑中〇 09:30-14:00
+```
+
+---
+
+### イベント
+
+タイトル：
+
+```txt
+E-bike体験ツアー
+```
+
+説明欄：
+
+```txt
+砂川、畑中
+```
+
+時間：
+
+```txt
+10:00-13:00
+```
+
+---
+
+### 結果
+
+| スタッフ | AM  | PM        |
+| ---- | --- | --------- |
+| 砂川   | Off | Available |
+| 畑中   | Off | Off       |
+
+---
+
+# 必須ヘッダ
+
+```txt
+Date
+Staff
+Time Slot
+Status
+Tour
+Booked
+Capacity
+Notes
+Source
+Manual Lock
+```
+
+---
+
+# 検証チェックリスト
+
+* Apps Script 保存
+* 初回手動実行
+* 権限承認
+* Logs 確認
+* 今日〜最終日まで日付欠落なし
+* Manual Lock 行未変更
+* index.html 表示確認
+
+---
+
+# 推奨コミットメッセージ
+
+```txt
+Fix calendar sync rules: explicit Off/Available regex, AM/PM windows, shared calendar handling, and full-date target range
+```
+
+---
+
+# 運用上の注意
+
+* Googleカレンダー共有権限変更時は取得失敗する可能性あり
+* Googleカレンダーでは固定表記（砂川 / 畑中）を使用する
+* fill_missing_dates は補助用途
+* fill_missing_dates は根本対策ではない
+* 主修正対象は sync_availability.gs

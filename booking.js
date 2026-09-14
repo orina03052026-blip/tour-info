@@ -1,10 +1,13 @@
 /* Unified booking form (Algueblue + cycling + Himeji castle).
  * Talks to the Apps Script Web App: GET ?action=availability / POST (text/plain JSON).
  * Deploy the Web App, then paste its /exec URL below. */
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyL_cqU6-SkSg7yNXCSterbVFVM4lPp8d6W4mJQyvXKSh7Qqu2Njsr_pPz11v8rvJw/exec';
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzpGzicfO_KShS1JmmoxiZZexTgmffUOwagyUjplLmDFSc9DDDj_tT_h2s2PzuaKZkf/exec';
 
-// アルグブルーの「先の予約」で表示する日数（今日から HORIZON_DAYS 日先まで）。GAS の algueblueOpenDays と揃える。
-const HORIZON_DAYS = 30;
+// アルグブルーの「先の予約」で表示する日数（今日から ALGUEBLUE_HORIZON_DAYS 日先まで）。GAS の algueblueOpenDays と揃える。
+const ALGUEBLUE_HORIZON_DAYS = 30;
+// ツアー（e-bike/城ガイド/午後工芸ツアー）の「See more dates」で表示する日数。
+// 海外ゲストの3〜6か月前予約に対応するため2026-09-08に拡張。GAS の tourOpenDays 上限(190)と揃える。
+const TOUR_HORIZON_DAYS = 183;
 
 // ▼メンテナンス用スイッチ。true の間は「停止対象アクティビティ」だけ申込を止め、案内を表示する。
 //   ツアー等は通常どおり受付。作業が終わったら false に戻して push すれば通常運用に復帰する。
@@ -32,9 +35,13 @@ const ACTIVITIES = [
   { code: 'ebike-sea',    label: 'e-bike Ride to the Sea',          kind: 'tour', maxPeople: 4 },
   // payFirst: バックエンド(BOOKING_CONFIG.tours['castle-guide'].payFirst)と揃える。2026-08 先払い制トライアル第1弾。
   { code: 'castle-guide', label: 'Himeji Castle Guide Tour',         kind: 'tour', maxPeople: 8, payFirst: true },
-  { code: 'craft-course1', label: 'Afternoon Craft Tour — Calligraphy + Wagashi Making', kind: 'tour', maxPeople: 6, minPeople: 2 },
-  { code: 'craft-course2', label: 'Afternoon Craft Tour — Calligraphy + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
-  { code: 'craft-course3', label: 'Afternoon Craft Tour — Indigo Dyeing + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2 },
+  // 2026-09-04: hiddenFromPicker — 「WHAT WOULD YOU LIKE TO BOOK?」の一覧には出さない。
+  // このページ(Availability)はQRコードで「Last Minute Adventure!」として案内されており、
+  // 7日前予約必須の工芸ツアーはその趣旨に合わないためユーザー指示で非表示にした。
+  // ACTIVITIES配列自体からは削除していないので、?activity=craft-course1 等の直リンクは引き続き機能する。
+  { code: 'craft-course1', label: 'Afternoon Craft Tour — Calligraphy + Wagashi Making', kind: 'tour', maxPeople: 6, minPeople: 2, hiddenFromPicker: true },
+  { code: 'craft-course2', label: 'Afternoon Craft Tour — Calligraphy + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2, hiddenFromPicker: true },
+  { code: 'craft-course3', label: 'Afternoon Craft Tour — Indigo Dyeing + Gold Leaf Application', kind: 'tour', maxPeople: 6, minPeople: 2, hiddenFromPicker: true },
 ];
 
 const state = {
@@ -136,6 +143,34 @@ function subtractMinutes(hhmm, min) {
 async function init() {
   const qs = new URLSearchParams(location.search);
 
+  // 2026-09-04: Android Chrome等の「強制ダークモード」対策。既存CSSに .booking-embed 内だけ
+  // color-scheme: light を指定していたが、ブラウザのダーク化判定はページ全体(html/root)を見るため
+  // 効かず、実際の訪問者(PC・スマホとも)にはページ全体が灰色がかって表示されてしまっていた。
+  // documentのhead/rootにも明示することで、この予約ウィジェットを含むページ全体をライト固定にする。
+  if (!document.querySelector('meta[name="color-scheme"]')) {
+    const meta = document.createElement('meta');
+    meta.name = 'color-scheme';
+    meta.content = 'light';
+    document.head.appendChild(meta);
+  }
+  document.documentElement.style.colorScheme = 'light';
+
+  // 2026-09-04: 「WHAT WOULD YOU LIKE TO BOOK?」カードが実機(iPhone等)で灰色に見えるという報告への
+  // 決定打の対策。computed styleではbackground:#fffになっていることを何重にも確認済みで、CSS上の
+  // 原因は特定できなかった（ダークモード判定・カスケードの競合・重なった要素、いずれも否定）。
+  // 原因の特定より確実な解決を優先し、最高優先度(inline + !important)で強制的に白で上書きする。
+  function forceWhiteBg() {
+    const targets = document.querySelectorAll('#form-body, #activities, .choice, .card');
+    targets.forEach((el) => {
+      el.style.setProperty('background', '#ffffff', 'important');
+      el.style.setProperty('background-color', '#ffffff', 'important');
+      el.style.setProperty('background-image', 'none', 'important');
+    });
+  }
+  forceWhiteBg();
+  // ボタン等が動的に再描画された後にも効かせる（renderActivities/renderDates等の再実行後）。
+  new MutationObserver(forceWhiteBg).observe(document.body, { childList: true, subtree: true });
+
   // 先払い制（PayPal Orders v2）からの戻り。通常のウィザードは出さず、専用の画面だけ表示する。
   if (qs.get('cancelled') === '1') { showPaymentCancelled(); return; }
   if (qs.get('paypalReturn') === '1' && qs.get('token')) { showPaymentPendingConfirmation(); return; }
@@ -147,11 +182,39 @@ async function init() {
   const presetPlan = qs.get('plan');
   if (presetPlan && ['plan01', 'plan02', 'plan03'].indexOf(presetPlan) !== -1) state.presetPlan = presetPlan;
   renderActivities();
+
+  // 埋め込みモード（&compact=1）: 他のWordPressページに iframe で直接埋め込む用。
+  // WordPressテーマ側のヘッダー/フッター/管理バー/パンくずを隠し、予約フォームだけを表示する
+  // （これらを隠さないと、iframeの小さい枠内にサイト全体のレイアウトが二重に描画されて崩れる）。
+  // 注意: パラメータ名は "embed" にしないこと — WordPressコア組み込みのoEmbed機能(?embed=1)と衝突し、
+  // ページ全体がWP標準の埋め込みプレビューカードに差し替えられてしまう(2026-09-04に実際に踏んだ)。
+  if (qs.get('compact') === '1') {
+    const style = document.createElement('style');
+    style.textContent = [
+      '#wpadminbar, #site-header, #breadcrumb, .site-footer, .page-header { display: none !important; }',
+      'html { margin-top: 0 !important; }',
+      'body { margin: 0 !important; padding-top: 0 !important; background: #fff !important; }',
+      '.site-body-container, .main-section, .entry-body { padding: 0 !important; margin: 0 !important; max-width: none !important; }',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    // activity も指定されている場合（各ツアーページへの単一アクティビティ埋め込み）は、
+    // 「Book Your Experience」見出しと「何を予約しますか」選択セクションも非表示にし、
+    // 日付選択から即表示する。activity 未指定（Availabilityページへの全体埋め込み等）は
+    // 見出し・選択メニューをそのまま見せる。
+    if (state.activity) {
+      const header = document.querySelector('.booking-wrap > .page-header');
+      if (header) header.hidden = true;
+      const pickerSection = document.querySelector('#form-body > section.block');
+      if (pickerSection) pickerSection.hidden = true;
+      state.showTourCalendar = true; // 埋め込み時は「See more dates」を押さなくても最初からカレンダー全体を表示する
+    }
+  }
   try {
     // 今日・明日の空き（全アクティビティ共通）と、アルグブルーの候補日（60日分）を並行取得
     const [availRes, openRes] = await Promise.all([
       fetch(WEBAPP_URL + '?action=availability', { cache: 'no-store' }),
-      fetch(WEBAPP_URL + '?action=algueblueOpenDays&days=' + HORIZON_DAYS, { cache: 'no-store' }).catch(() => null),
+      fetch(WEBAPP_URL + '?action=algueblueOpenDays&days=' + ALGUEBLUE_HORIZON_DAYS, { cache: 'no-store' }).catch(() => null),
     ]);
     const data = await availRes.json();
     if (!data.ok) throw new Error(data.error || 'load failed');
@@ -188,7 +251,7 @@ function maybePresetPlan() {
 function renderActivities() {
   const wrap = $('#activities');
   wrap.innerHTML = '';
-  ACTIVITIES.forEach((a) => {
+  ACTIVITIES.filter((a) => !a.hiddenFromPicker).forEach((a) => {
     const b = el('button', 'choice' + (state.activity === a.code ? ' selected' : ''), esc(a.label));
     b.type = 'button';
     b.onclick = () => { Object.assign(state, { activity: a.code, date: null, plan: null, option: null, start: null, pickup: null, height: '', showTourCalendar: false, calMonth: null }); renderActivities(); renderDates(); renderDetails(); renderSummary(); };
@@ -248,7 +311,7 @@ function renderTourDates(wrap) {
   }
 }
 
-/* ---- アルグブルー用 月カレンダー（今日〜HORIZON_DAYS日先） ---- */
+/* ---- 月カレンダー共通部品（アルグブルー・ツアー兼用。今日〜horizonDays日先） ---- */
 const CAL_MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const CAL_DOW = ['日/Su', '月/Mo', '火/Tu', '水/We', '木/Th', '金/Fr', '土/Sa'];
 
@@ -266,9 +329,10 @@ function isAlgueblueDayOpen(ds) {
 }
 
 // 月カレンダーの共通描画（アルグブルー・ツアー兼用）。isOpenFn(ds)で開いている日を判定し、onSelect(ds)で選択する。
-function renderCalendarGrid(wrap, isOpenFn, onSelect) {
+// horizonDays: 今日から何日先まで表示するか（アルグブルーとツアーで上限が異なるため呼び出し側から渡す）。
+function renderCalendarGrid(wrap, horizonDays, isOpenFn, onSelect) {
   const today = todayYmd();
-  const endYmd = addDaysYmd(today, HORIZON_DAYS - 1);
+  const endYmd = addDaysYmd(today, horizonDays - 1);
   const todayD = ymdToDate(today), endD = ymdToDate(endYmd);
   if (!state.calMonth) state.calMonth = { y: todayD.getFullYear(), m: todayD.getMonth() };
   const y = state.calMonth.y, m = state.calMonth.m;
@@ -310,7 +374,7 @@ function renderCalendarGrid(wrap, isOpenFn, onSelect) {
 }
 
 function renderAlgueblueCalendar(wrap) {
-  renderCalendarGrid(wrap, isAlgueblueDayOpen, selectAlgueblueDate);
+  renderCalendarGrid(wrap, ALGUEBLUE_HORIZON_DAYS, isAlgueblueDayOpen, selectAlgueblueDate);
   if (!(state.openDays || []).length) {
     wrap.appendChild(el('p', 'muted small',
       '現在ご予約いただける日がありません。カレンダーにスタッフの出勤予定が入り次第、ここに表示されます。 / No open dates yet — dates appear once staff shifts are added to the calendar.'));
@@ -330,15 +394,15 @@ function renderTourCalendar(wrap) {
   const code = state.activity;
   if (!state.tourOpenDays[code]) {
     wrap.appendChild(el('p', 'muted small', 'Loading available dates…'));
-    fetch(WEBAPP_URL + '?action=tourOpenDays&activity=' + encodeURIComponent(code) + '&days=' + HORIZON_DAYS, { cache: 'no-store' })
+    fetch(WEBAPP_URL + '?action=tourOpenDays&activity=' + encodeURIComponent(code) + '&days=' + TOUR_HORIZON_DAYS, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => { state.tourOpenDays[code] = (d && d.ok && d.openDays) || []; if (state.activity === code) renderDates(); })
       .catch(() => { state.tourOpenDays[code] = []; if (state.activity === code) renderDates(); });
     return;
   }
-  renderCalendarGrid(wrap, isTourDayOpen, selectTourDate);
+  renderCalendarGrid(wrap, TOUR_HORIZON_DAYS, isTourDayOpen, selectTourDate);
   if (!(state.tourOpenDays[code] || []).length) {
-    wrap.appendChild(el('p', 'muted small', 'No open dates in the next ' + HORIZON_DAYS + ' days.'));
+    wrap.appendChild(el('p', 'muted small', 'No open dates in the next ' + TOUR_HORIZON_DAYS + ' days.'));
   }
 }
 
